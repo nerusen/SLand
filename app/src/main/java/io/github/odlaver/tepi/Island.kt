@@ -40,6 +40,7 @@ import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 
 // Overlay around the front camera; hosts scenes
 @SuppressLint("ViewConstructor")
@@ -114,6 +115,8 @@ class Island(
     private val radB = Spring(0f, 0.3f)
     private val bubbleK = Spring(0f, 0.004f, 420f, 30f)
     private val contentA = Spring(0f, 0.004f, 520f, 46f)
+    // Logo and battery fade with the resting capsule, apart from scene content
+    private val idleA = Spring(0f, 0.004f, 520f, 46f)
     private val now = RectF()
     private val target = RectF()
     private val bubble = RectF()
@@ -130,6 +133,8 @@ class Island(
     private var fullscreen = false
     private var hiddenUntil = 0L
     private var lastTouch = 0L
+    private var batteryLevel = -1
+    private var batteryCharging = false
 
     private val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private val shape = Path()
@@ -191,6 +196,17 @@ class Island(
     }
 
     fun mediaChanged() = music.changed()
+
+    // Straight from ACTION_BATTERY_CHANGED, so the resting capsule shows the
+    // same level Android does
+    fun battery(level: Int, charging: Boolean) {
+        if (level == batteryLevel && charging == batteryCharging) return
+        batteryLevel = level
+        batteryCharging = charging
+        // onDraw reads the level directly; no geometry moved, so a repaint is
+        // enough and the frame loop can stay asleep
+        if (kind == Kind.Idle) invalidate()
+    }
 
     fun prefsChanged() {
         measureScreen()
@@ -416,6 +432,7 @@ class Island(
 
         wantedKey = "$kind:${primary?.id}"
         if (wantedKey != shownKey) contentA.target = 0f
+        idleA.target = if (kind == Kind.Idle) 1f else 0f
         contentDescription = primary?.describe()
 
         // Grow first; shrink once settled
@@ -469,6 +486,7 @@ class Island(
         var moving = false
         for (s in arrayOf(l, t, r, b, rad, neck, split, radB, bubbleK)) moving = s.step(dt) or moving
         moving = contentA.step(dt) or moving
+        moving = idleA.step(dt) or moving
         if (contentA.value <= 0.05f && contentA.target == 0f) {
             shownKey = wantedKey
             shownScene = primary
@@ -550,7 +568,50 @@ class Island(
             box.set(bubble)
             sec.drawBubble(canvas, box, k * a)
         }
+        // Resting chrome last, on its own fade, so it never shows over a
+        // scene. Clipped to the capsule, so a half-grown shape cannot leak it.
+        val ia = idleA.value.coerceIn(0f, 1f)
+        if (ia > 0.01f) drawIdleChrome(canvas, ia)
         canvas.restore()
+    }
+
+    // Logo hard left, battery hard right, both inside the capsule with the
+    // same gap on the left, top and bottom. The camera cradle in the middle is
+    // left alone: the marks shrink to fit beside it, and are dropped entirely
+    // rather than drawn too small to read.
+    private fun drawIdleChrome(c: Canvas, a: Float) {
+        val capH = now.height()
+        if (capH <= 0f) return
+        // Flat room between a capsule end and the lens
+        val room = (now.width() - hole.width()) / 2 - ui.s8
+        if (room <= 0f) return
+        // One height for both marks. Padding is (capH - h) / 2 on every side,
+        // so h has to satisfy capH / 2 + h * (aspect - 0.5) <= room. The
+        // battery is the wider of the two, so it sets the limit; the extra dp
+        // covers the battery's minimum nub width at small heights, so the two
+        // marks always appear and disappear together.
+        val widest = max(Ui.LOGO_ASPECT, Ui.BATTERY_SLOT_ASPECT)
+        val h = min(ui.dp(13f), (room - capH / 2 - ui.dp(1f)) / (widest - 0.5f))
+        if (h < ui.dp(7f)) return
+
+        // The capsule ends are round, so the flat inset also has to clear the
+        // curve at the mark's own height
+        val rr = capH / 2
+        val bulge = rr - sqrt(max(0f, rr * rr - (h / 2) * (h / 2)))
+        val inset = max((capH - h) / 2, bulge + ui.s4)
+        val top = now.centerY() - h / 2
+
+        val logoL = now.left + inset
+        if (logoL + h * Ui.LOGO_ASPECT <= hole.left - ui.s8) {
+            box.set(logoL, top, logoL + h * Ui.LOGO_ASPECT, top + h)
+            ui.logo(c, box, ui.ink, a)
+        }
+
+        val battR = now.right - inset
+        if (batteryLevel >= 0 && battR - ui.batteryWidth(h) >= hole.right + ui.s8) {
+            box.set(battR - ui.batteryWidth(h), top, battR, top + h)
+            ui.battery(c, box, batteryLevel, batteryCharging, a)
+        }
     }
 
     // Left and right of the camera inside the neck

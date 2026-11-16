@@ -66,6 +66,8 @@ class Ui(context: Context) {
     private val shaderM = Matrix()
     private val glyph = Path()
     private val tmp = RectF()
+    private val cell = RectF()
+    private val slot = RectF()
 
     fun alpha(color: Int, a: Float) = Color.argb((Color.alpha(color) * a).toInt().coerceIn(0, 255), Color.red(color), Color.green(color), Color.blue(color))
 
@@ -213,8 +215,109 @@ class Ui(context: Context) {
         c.drawCircle(cx, cy, r, solid)
     }
 
+    // Nelsen mark, from assets/nelsen-logo.svg. The source is a single closed
+    // polygon of straight segments, so these are its points normalised to its
+    // own bounding box: an exact copy, not an approximation. Keep them in sync
+    // with the SVG if the mark is ever redrawn.
+    fun logo(c: Canvas, at: RectF, color: Int, a: Float) {
+        if (at.width() <= 0f || at.height() <= 0f) return
+        glyph.reset()
+        var i = 0
+        while (i < LOGO.size) {
+            val x = at.left + LOGO[i] * at.width()
+            val y = at.top + LOGO[i + 1] * at.height()
+            if (i == 0) glyph.moveTo(x, y) else glyph.lineTo(x, y)
+            i += 2
+        }
+        glyph.close()
+        solid.color = alpha(color, a)
+        c.drawPath(glyph, solid)
+    }
+
+    // Battery, iOS style: rounded shell, nub on the right, fill inside.
+    // Level is 0..100; the fill keeps a visible sliver so a nearly empty
+    // battery still reads as a battery.
+    fun battery(c: Canvas, at: RectF, level: Int, charging: Boolean, a: Float) {
+        if (at.height() <= 0f) return
+        val h = at.height()
+        val nubGap = h * NUB_GAP
+        val nubW = max(dp(1f), h * NUB_W)
+        val shellW = h * BATTERY_ASPECT
+        // Sit the nub flush against the right edge of the slot
+        val right = at.right - nubW - nubGap
+        cell.set(right - shellW, at.top, right, at.bottom)
+        val radius = h * 0.32f
+        val line = max(dp(1f), h * 0.085f)
+
+        // Shell outline, inset by half the stroke so it stays inside the slot
+        cell.inset(line / 2, line / 2)
+        stroke.strokeWidth = line
+        stroke.color = alpha(ink, a * 0.45f)
+        c.drawRoundRect(cell, radius, radius, stroke)
+
+        // Nub
+        val nubH = h * 0.34f
+        solid.color = alpha(ink, a * 0.45f)
+        slot.set(at.right - nubW, at.centerY() - nubH / 2, at.right, at.centerY() + nubH / 2)
+        c.drawRoundRect(slot, nubW / 2, nubW / 2, solid)
+
+        // Fill
+        val inset = line * 1.1f
+        val room = cell.width() - inset * 2
+        val frac = level.coerceIn(0, 100) / 100f
+        val w = max(room * 0.08f, room * frac)
+        slot.set(cell.left + inset, cell.top + inset, cell.left + inset + w, cell.bottom - inset)
+        solid.color = alpha(batteryTint(level, charging), a)
+        val fr = slot.height() * 0.3f
+        c.drawRoundRect(slot, fr, fr, solid)
+    }
+
+    // Matches what Android itself signals: green while charging, amber at the
+    // 20% "low" warning, red at the 10% "critical" one, plain ink otherwise
+    fun batteryTint(level: Int, charging: Boolean) = when {
+        charging -> GREEN
+        level <= 10 -> RED
+        level <= 20 -> AMBER
+        else -> ink
+    }
+
+    // How wide the battery wants to be for a given row height: shell, the gap,
+    // and the nub. The nub ends flush with the right edge of the slot.
+    fun batteryWidth(h: Float) = h * BATTERY_ASPECT + h * NUB_GAP + max(dp(1f), h * NUB_W)
+
     fun clock(ms: Long): String {
         val s = (ms / 1000).coerceAtLeast(0)
         return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s / 60 % 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
+    }
+
+    companion object {
+        // System greens, ambers and reds, same family as CallScene's
+        private val GREEN = Color.rgb(52, 199, 89)
+        private val AMBER = Color.rgb(255, 204, 0)
+        private val RED = Color.rgb(255, 69, 58)
+
+        // iOS battery shell proportions, width over height
+        private const val BATTERY_ASPECT = 1.95f
+        private const val NUB_GAP = 0.08f
+        private const val NUB_W = 0.1f
+
+        // assets/nelsen-logo.svg, normalised to its content bounding box
+        private val LOGO = floatArrayOf(
+            0.000000f, 0.965979f,
+            0.554167f, 0.000000f,
+            0.663450f, 0.581558f,
+            0.783082f, 0.372218f,
+            1.000000f, 0.372112f,
+            0.638729f, 1.000000f,
+            0.554626f, 0.554553f,
+            0.318777f, 0.966474f,
+        )
+
+        // Logo width over height, from the same bounding box
+        const val LOGO_ASPECT = 2.047829f
+
+        // Battery slot width over height, for callers reserving room before
+        // they know the final height
+        const val BATTERY_SLOT_ASPECT = BATTERY_ASPECT + NUB_GAP + NUB_W
     }
 }

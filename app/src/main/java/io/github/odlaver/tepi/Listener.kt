@@ -78,7 +78,10 @@ class Listener : NotificationListenerService() {
         pc = Pc(this, agenda.vault, prefs) { island?.refresh() }
         pc.onFile = { name, uri -> fromLaptop(name, uri) }
         live = Live(this, prefs, { n, pkg -> n.getLargeIcon()?.loadDrawable(this)?.let { bitmap(it) } ?: appIcon(pkg) }) { island?.refresh() }
-        watch = Watch(this, prefs, brief = { k, t -> briefs?.show(k, t) }, lowBattery = { lowBattery(it) }, battery = { l, c -> pc.battery(l, c) }, privacy = { cam, mic ->
+        watch = Watch(this, prefs, brief = { k, t -> briefs?.show(k, t) }, lowBattery = { lowBattery(it) }, battery = { l, c ->
+            pc.battery(l, c)
+            island?.battery(l, c)
+        }, privacy = { cam, mic ->
             privacyScene?.let { it.cam = cam; it.mic = mic }
             island?.refresh()
         })
@@ -153,6 +156,9 @@ class Listener : NotificationListenerService() {
                 wire(it)
                 it.attach()
                 it.mediaChanged()
+                // Watch registered before this island existed, so hand it the
+                // level it already has instead of waiting for the next change
+                if (watch.level >= 0) it.battery(watch.level, watch.charging)
             } catch (_: Exception) {
                 island = null
             }
