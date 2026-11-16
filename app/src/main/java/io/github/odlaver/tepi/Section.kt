@@ -28,6 +28,13 @@ class Section : Page() {
     private fun island() {
         header(getString(R.string.section_island))
         val g = group()
+        toggle(g, getString(R.string.idle_bar), getString(R.string.idle_bar_sub), prefs.idleBar, icon = Icon.Layers) {
+            prefs.idleBar = it; changed()
+        }
+        slider(g, getString(R.string.idle_width), Prefs.IDLE_WIDTH_MIN, Prefs.IDLE_WIDTH_MAX, prefs.idleWidthDp, { "$it dp" }, Icon.Chevron) {
+            prefs.idleWidthDp = it
+            changed()
+        }
         toggle(g, getString(R.string.camera_tap), getString(if (a11y()) R.string.camera_tap_sub else R.string.camera_tap_off), prefs.cameraTap, a11y(), Icon.Camera) {
             prefs.cameraTap = it; changed()
         }
@@ -260,8 +267,8 @@ class Section : Page() {
                 }
             }
         }, Icon.Info)
-        row(g, getString(R.string.source), "github.com/odlaver/tepi-android", icon = Icon.Code) {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/odlaver/tepi-android")))
+        row(g, getString(R.string.source), "github.com/${BuildConfig.REPO}", icon = Icon.Code) {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/${BuildConfig.REPO}")))
         }
         row(g, getString(R.string.coffee), getString(R.string.coffee_sub), icon = Icon.Coffee) {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(MainActivity.COFFEE)))

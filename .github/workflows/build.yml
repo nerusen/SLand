@@ -1,0 +1,110 @@
+name: Build SLand
+
+on:
+  push:
+    branches: ['**']
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # Step-level `if` cannot read secrets, so the keystore is lifted into the
+    # job environment and tested from there.
+    env:
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+
+    steps:
+      - name: Check out the source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Restore the signing keystore
+        id: keystore
+        if: env.KEYSTORE_BASE64 != ''
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/sland.jks"
+          echo "present=true" >> "$GITHUB_OUTPUT"
+
+      # Release is only built when a keystore exists. Without one, AGP emits an
+      # unsigned release APK that Android refuses to install, so the run would
+      # hand back a useless file.
+      - name: Assemble
+        id: assemble
+        env:
+          KEYSTORE_PRESENT: ${{ steps.keystore.outputs.present }}
+          STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -e
+          if [ "$KEYSTORE_PRESENT" = "true" ]; then
+            variants="debug release"
+            tasks="assembleDebug assembleRelease"
+            set -- \
+              "-PSLAND_STORE=$RUNNER_TEMP/sland.jks" \
+              "-PSLAND_STORE_PASSWORD=$STORE_PASSWORD" \
+              "-PSLAND_KEY_ALIAS=${KEY_ALIAS:-sland}" \
+              "-PSLAND_KEY_PASSWORD=${KEY_PASSWORD:-$STORE_PASSWORD}"
+          else
+            echo "::notice::No KEYSTORE_BASE64 secret. Building debug only, with the Android debug key."
+            variants="debug"
+            tasks="assembleDebug"
+            set --
+          fi
+          ./gradlew --no-daemon $tasks "$@"
+          echo "variants=$variants" >> "$GITHUB_OUTPUT"
+
+      # Gradle already writes SLand-debug.apk and SLand-release.apk through
+      # base.archivesName. This stamps the version and the short commit on top
+      # so separate runs stay apart in the Actions download list.
+      - name: Name the APKs
+        id: name
+        env:
+          VARIANTS: ${{ steps.assemble.outputs.variants }}
+        run: |
+          set -e
+          version=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          short=$(git rev-parse --short HEAD)
+          mkdir -p artifacts
+          for variant in $VARIANTS; do
+            src=$(find "app/build/outputs/apk/$variant" -name '*.apk' -print -quit)
+            if [ -z "$src" ]; then
+              echo "::error::No $variant APK was produced."
+              exit 1
+            fi
+            cp "$src" "artifacts/SLand-${version}-${short}-${variant}.apk"
+          done
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "short=$short" >> "$GITHUB_OUTPUT"
+          ls -lh artifacts
+
+      - name: Upload the APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: SLand-${{ steps.name.outputs.version }}-${{ steps.name.outputs.short }}
+          path: artifacts/*.apk
+          if-no-files-found: error
+          retention-days: 30

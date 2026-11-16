@@ -52,7 +52,8 @@ class Island(
     private val prefs: Prefs,
     lyrics: Lyrics,
 ) : View(context), Host {
-    private enum class Kind { Hidden, Compact, Panel }
+    // Idle: a resting capsule when nothing is happening
+    private enum class Kind { Hidden, Idle, Compact, Panel }
 
     override val ui = Ui(context)
     override val ctx: Context get() = context
@@ -194,6 +195,7 @@ class Island(
     fun prefsChanged() {
         measureScreen()
         music.reload()
+        refresh()
     }
 
     fun openHome() = expand(home)
@@ -337,6 +339,11 @@ class Island(
         // The fullscreen probe goes dark under the lock screen; ignore it there
         val quiet = landscape || (fullscreen && !lock) || hiddenUntil > SystemClock.uptimeMillis() || (lock && !prefs.bool("lockscreen", true))
         val shown = if (quiet) live.filter { it.priority >= URGENT } else live
+        // The resting capsule outlives fullscreen apps; only the island's own
+        // off switches put it away
+        val resting = prefs.idleBar && !landscape &&
+            hiddenUntil <= SystemClock.uptimeMillis() &&
+            !(lock && !prefs.bool("lockscreen", true))
         val op = opened
         when {
             op != null -> { kind = Kind.Panel; primary = op; second = null }
@@ -346,9 +353,14 @@ class Island(
                 primary = shown[0]
                 second = shown.getOrNull(1)?.takeIf { !it.card() }
             }
+            resting -> { kind = Kind.Idle; primary = null; second = null }
             else -> { kind = Kind.Hidden; primary = null; second = null }
         }
     }
+
+    // Resting capsule: never thinner than the camera cradle, never wider
+    // than a panel
+    private fun idleWidth() = ui.dp(prefs.idleWidthDp.toFloat()).coerceIn(pill.width(), max(pill.width(), wide))
 
     private fun compactWidth(s: Scene?) = pill.width() + max(s?.wing() ?: 0f, wingBase) * 2
 
@@ -364,6 +376,11 @@ class Island(
         when (kind) {
             Kind.Hidden -> {
                 target.set(hole); nk = hole.width(); sy = hole.top; rt = hole.height() / 2; rb = rt
+            }
+            Kind.Idle -> {
+                val w = idleWidth()
+                target.set(cx - w / 2, pill.top, cx + w / 2, pill.bottom)
+                nk = w; sy = pill.top
             }
             Kind.Compact -> {
                 val w = compactWidth(primary)
@@ -405,15 +422,24 @@ class Island(
         val union = RectF(target)
         union.union(l.value, t.value, r.value, b.value)
         if (second != null || bubbleK.value > 0.01f) union.union(bubble)
-        place(union, kind != Kind.Hidden || hotspot())
+        place(union, wantsTouch())
         kick()
     }
 
     private fun hotspot() = touchable && prefs.cameraTap
 
+    // The resting capsule sits in the status bar. Only the accessibility
+    // window may take touches up there; an app overlay would swallow part of
+    // the pull-down gesture for as long as the capsule is up, so it stays
+    // untouchable and purely visual instead.
+    private fun wantsTouch() = when (kind) {
+        Kind.Hidden, Kind.Idle -> hotspot()
+        else -> true
+    }
+
     // Window covers the moving shape only
     private fun place(rect: RectF, touch: Boolean) {
-        val grow = if (kind == Kind.Hidden && touch) ui.s8 else 0f
+        val grow = if (touch && (kind == Kind.Hidden || kind == Kind.Idle)) ui.s8 else 0f
         val x = (rect.left - grow).toInt() - 2
         val y = max(0, (rect.top - grow).toInt() - 2)
         lp.x = x
@@ -447,8 +473,9 @@ class Island(
             shownKey = wantedKey
             shownScene = primary
             shownKind = kind
-            contentA.target = if (kind == Kind.Hidden) 0f else 1f
-            if (kind == Kind.Hidden) contentA.snap(0f)
+            val bare = kind == Kind.Hidden || kind == Kind.Idle
+            contentA.target = if (bare) 0f else 1f
+            if (bare) contentA.snap(0f)
         }
         for (s in scenes) moving = s.step(dt) or moving
         val op = opened
@@ -465,11 +492,14 @@ class Island(
     }
 
     private fun settle() {
-        if (kind == Kind.Hidden) place(if (hotspot()) pill else hole, hotspot())
-        else {
-            val rect = RectF(target)
-            if (second != null) rect.union(bubble)
-            place(rect, true)
+        when (kind) {
+            Kind.Hidden -> place(if (hotspot()) pill else hole, hotspot())
+            Kind.Idle -> place(target, wantsTouch())
+            else -> {
+                val rect = RectF(target)
+                if (second != null) rect.union(bubble)
+                place(rect, true)
+            }
         }
     }
 
@@ -513,7 +543,7 @@ class Island(
                     }
                 }
             }
-            Kind.Hidden -> Unit
+            Kind.Hidden, Kind.Idle -> Unit
         }
         val sec = second
         if (k > 0.05f && sec != null && shownKind == Kind.Compact) {
@@ -586,6 +616,11 @@ class Island(
             box.set(pill); box.inset(-ui.s8, -ui.s8)
             return hotspot() && box.contains(x, y)
         }
+        if (kind == Kind.Idle) {
+            if (!hotspot()) return false
+            box.set(now); box.inset(-ui.s4, -ui.s8)
+            return box.contains(x, y)
+        }
         if (now.contains(x, y)) return true
         return second != null && bubble.contains(x, y)
     }
@@ -632,7 +667,7 @@ class Island(
 
     private fun swipeDown() {
         when (kind) {
-            Kind.Hidden -> openHome()
+            Kind.Hidden, Kind.Idle -> openHome()
             Kind.Compact -> primary?.let { expand(it) }
             Kind.Panel -> Unit
         }
@@ -642,7 +677,7 @@ class Island(
         when (kind) {
             Kind.Panel -> if (opened != null) collapse() else primary?.dismiss()
             Kind.Compact -> primary?.dismiss()
-            Kind.Hidden -> Unit
+            Kind.Hidden, Kind.Idle -> Unit
         }
         refresh()
     }
@@ -663,7 +698,7 @@ class Island(
 
     private fun tap(x: Float, y: Float) {
         when (kind) {
-            Kind.Hidden -> openHome()
+            Kind.Hidden, Kind.Idle -> openHome()
             Kind.Compact -> {
                 val sec = second
                 if (sec != null && bubble.contains(x, y)) expand(sec)

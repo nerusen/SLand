@@ -135,7 +135,7 @@
 
         <provider
             android:name=".ShelfProvider"
-            android:authorities="io.github.odlaver.tepi.shelf"
+            android:authorities="${applicationId}.shelf"
             android:exported="false"
             android:grantUriPermissions="true" />
 

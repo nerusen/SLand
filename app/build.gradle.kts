@@ -5,37 +5,52 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// APK files come out as SLand-<buildType>.apk instead of app-<buildType>.apk
+base {
+    archivesName.set("SLand")
+}
+
 android {
     namespace = "io.github.odlaver.tepi"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "io.github.odlaver.tepi"
+        applicationId = "com.nelsencreative.sland"
         minSdk = 29
         targetSdk = 36
-        versionCode = 26
-        versionName = "2.5.1"
+        versionCode = 1
+        versionName = "1.0.0"
         // Modern phones only; keeps ML Kit's native code small
         ndk { abiFilters += listOf("arm64-v8a") }
+        // Where Check for updates and Source code point; must match the
+        // GitHub repo that publishes the releases
+        buildConfigField("String", "REPO", "\"nerusen/SLand\"")
     }
 
-    // Publisher key lives outside the repo
-    val store = providers.gradleProperty("TEPI_STORE").orNull
+    // Signing key lives outside the repo: in ~/.gradle/gradle.properties
+    // locally, or written by the workflow from repository secrets in CI.
+    // Names differ from the signingConfig property names on purpose, so the
+    // assignments below cannot resolve to the wrong thing.
+    val storePath = providers.gradleProperty("SLAND_STORE").orNull
+    val storePass = providers.gradleProperty("SLAND_STORE_PASSWORD").orNull
+    val aliasName = providers.gradleProperty("SLAND_KEY_ALIAS").orNull ?: "sland"
+    val aliasPass = providers.gradleProperty("SLAND_KEY_PASSWORD").orNull ?: storePass
+    val signed = storePath != null && storePass != null && aliasPass != null
     signingConfigs {
-        if (store != null) create("tepi") {
-            storeFile = file(store)
-            storePassword = providers.gradleProperty("TEPI_STORE_PASSWORD").get()
-            keyAlias = "tepi"
-            keyPassword = providers.gradleProperty("TEPI_STORE_PASSWORD").get()
+        if (signed) create("sland") {
+            storeFile = file(storePath as String)
+            storePassword = storePass
+            keyAlias = aliasName
+            keyPassword = aliasPass
         }
     }
 
     buildTypes {
         debug {
-            if (store != null) signingConfig = signingConfigs.getByName("tepi")
+            if (signed) signingConfig = signingConfigs.getByName("sland")
         }
         release {
-            if (store != null) signingConfig = signingConfigs.getByName("tepi")
+            if (signed) signingConfig = signingConfigs.getByName("sland")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))

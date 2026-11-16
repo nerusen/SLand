@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">Tepi</string>
+    <string name="app_name" translatable="false">SLand</string>
     <string name="section_access">Access</string>
     <string name="perm_overlay">Display over other apps</string>
     <string name="perm_overlay_sub">Lets the island sit around the front camera.</string>
@@ -18,6 +18,9 @@
     <string name="notif_content">Show message text</string>
     <string name="notif_content_sub">Hidden while the phone is locked.</string>
     <string name="offset">Vertical position</string>
+    <string name="idle_bar">Always-on capsule</string>
+    <string name="idle_bar_sub">Keeps a wide capsule around the camera when nothing is happening, over apps and the camera too.</string>
+    <string name="idle_width">Resting width</string>
     <string name="test">Test the island</string>
     <string name="status_running">Island running</string>
     <string name="status_missing">Island stopped: access incomplete</string>
@@ -48,7 +51,7 @@
     <string name="greet_day">Good afternoon</string>
     <string name="greet_afternoon">Good evening</string>
     <string name="greet_night">Good night</string>
-    <string name="tile_label">Tepi</string>
+    <string name="tile_label">SLand</string>
     <string name="shortcut_home">Home</string>
     <string name="section_setup">Setup</string>
     <string name="status_blocked">Island stopped: blocked by Autostart</string>
@@ -190,7 +193,7 @@
     <string name="k_trouble">Kulia is having trouble</string>
     <string name="section_settings">Settings</string>
     <string name="section_connect">Connections</string>
-    <string name="sec_island_sub">Position, camera tap, gestures</string>
+    <string name="sec_island_sub">Resting capsule, position, camera tap, gestures</string>
     <string name="sec_activities_sub">Music, messages, calls, charging</string>
     <string name="sec_productivity_sub">Timer, notes, shelf</string>
     <string name="sec_reminders_sub">Prayer, water, eyes, classes</string>

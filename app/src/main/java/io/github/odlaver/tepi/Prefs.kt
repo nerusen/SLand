@@ -48,8 +48,23 @@ class Prefs(context: Context) {
         get() = int("offset", 0)
         set(v) = set("offset", v)
 
+    // Resting capsule when nothing is happening
+    var idleBar: Boolean
+        get() = bool("idle.bar", true)
+        set(v) = set("idle.bar", v)
+
+    // Width of the resting capsule in dp
+    var idleWidthDp: Int
+        get() = int("idle.width", IDLE_WIDTH_DEFAULT)
+        set(v) = set("idle.width", v)
+
     companion object {
         const val OFFSET_MIN = -8
         const val OFFSET_MAX = 24
+
+        // Around the width the island takes during a call
+        const val IDLE_WIDTH_DEFAULT = 150
+        const val IDLE_WIDTH_MIN = 90
+        const val IDLE_WIDTH_MAX = 260
     }
 }

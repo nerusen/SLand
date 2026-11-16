@@ -17,6 +17,9 @@
     <string name="notif_content">Tampilkan isi pesan</string>
     <string name="notif_content_sub">Disembunyikan selama HP terkunci.</string>
     <string name="offset">Posisi vertikal</string>
+    <string name="idle_bar">Capsule selalu tampil</string>
+    <string name="idle_bar_sub">Menahan capsule lebar di sekitar kamera saat tidak ada aktivitas, termasuk di atas aplikasi dan kamera.</string>
+    <string name="idle_width">Lebar saat diam</string>
     <string name="test">Uji island</string>
     <string name="status_running">Island berjalan</string>
     <string name="status_missing">Island berhenti: akses belum lengkap</string>
@@ -187,7 +190,7 @@
     <string name="k_trouble">Kulia sedang bermasalah</string>
     <string name="section_settings">Pengaturan</string>
     <string name="section_connect">Integrasi</string>
-    <string name="sec_island_sub">Posisi, ketuk kamera, gestur</string>
+    <string name="sec_island_sub">Capsule diam, posisi, ketuk kamera, gestur</string>
     <string name="sec_activities_sub">Musik, pesan, panggilan, pengisian daya</string>
     <string name="sec_productivity_sub">Timer, catatan, rak</string>
     <string name="sec_reminders_sub">Sholat, minum, mata, kelas</string>

@@ -7,7 +7,7 @@ class Release(val version: String, val apk: String, val page: String)
 // Newest v* release with an APK
 object Update {
     fun latest(): Release? {
-        val r = Net.send("GET", "https://api.github.com/repos/odlaver/tepi-android/releases?per_page=30", mapOf("Accept" to "application/vnd.github+json"))
+        val r = Net.send("GET", "https://api.github.com/repos/${BuildConfig.REPO}/releases?per_page=30", mapOf("Accept" to "application/vnd.github+json"))
         if (!r.ok) return null
         val arr = try { JSONArray(r.body) } catch (_: Exception) { return null }
         for (i in 0 until arr.length()) {
