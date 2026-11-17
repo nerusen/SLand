@@ -73,6 +73,41 @@ class Ui(context: Context) {
     private val tmp = RectF()
     private val cell = RectF()
     private val slot = RectF()
+    private val fillA = Path()
+    private val fillB = Path()
+
+    // How far a shape flares out where it meets the glass. One dimension for
+    // the notch and for the landscape panel both: the flare belongs to the
+    // junction with the bezel rather than to the size of whatever is hanging
+    // off it, so it stays put while a panel grows past it.
+    val glassFlare = dp(11f)
+
+    // Concave flares at the top two corners of a shape attached to the top
+    // edge of the screen.
+    //
+    // Not a rounded corner: a rounded corner curves away from the glass and
+    // leaves a sliver of wallpaper in the gap, which is what makes a drawn
+    // shape look stuck on top of the screen instead of cut out of it. This
+    // curves the other way — the sides sweep outwards as they reach the edge
+    // and meet it square, so the shape appears to grow out of the bezel. It is
+    // the same fillet the island already uses where its neck meets its body,
+    // turned to face the glass.
+    //
+    // Each corner is a square of side f sticking out from the shape, with a
+    // disc of radius f taken out of its outer bottom corner. What is left is a
+    // wedge with a concave edge, unioned onto the shape.
+    fun flare(out: Path, r: RectF, f: Float) {
+        if (f < 1f) return
+        for (side in intArrayOf(-1, 1)) {
+            val x = if (side < 0) r.left else r.right
+            fillA.reset()
+            fillA.addRect(min(x, x + side * f), r.top, max(x, x + side * f), r.top + f, Path.Direction.CW)
+            fillB.reset()
+            fillB.addCircle(x + side * f, r.top + f, f, Path.Direction.CW)
+            fillA.op(fillB, Path.Op.DIFFERENCE)
+            out.op(fillA, Path.Op.UNION)
+        }
+    }
 
     fun alpha(color: Int, a: Float) = Color.argb((Color.alpha(color) * a).toInt().coerceIn(0, 255), Color.red(color), Color.green(color), Color.blue(color))
 

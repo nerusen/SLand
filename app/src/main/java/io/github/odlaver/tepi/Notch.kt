@@ -66,13 +66,46 @@ class Notch(
     private val main = Handler(Looper.getMainLooper())
     private var attached = false
 
+    // Open and close: 1 is the full block, 0 is nothing at all.
+    //
+    // Not a fade. The island opens and closes by rebuilding its own outline at
+    // every step — width, height and radii all on springs — and the notch has
+    // to leave the same way or the two look like separate things fighting over
+    // the same edge. So the block collapses towards the middle of the edge and
+    // into the glass, staying a correctly proportioned notch the whole way,
+    // and the panel grows out of that same edge as it goes.
+    //
+    // Same constants as the island's own shape springs, so a notch handing
+    // over to a panel is one motion at one speed rather than two that happen
+    // to overlap.
+    private val grow = Spring(0f, 0.004f, 420f, 30f)
+    // The eyes' own fade, separate from the shape.
+    //
+    // When the island hands the edge back, it has already shrunk its panel
+    // down to this exact silhouette, so the notch arrives at full size with no
+    // shape animation of its own — the swap between two identical black blocks
+    // in the same place is invisible. What must not be instant is the face:
+    // the panel's content is still fading out underneath, and a pair of eyes
+    // snapping on over it is the one thing that would give the handover away.
+    // So the shape is instant and the eyes fade in, against the panel's
+    // content fading out.
+    private val look = Spring(0f, 0.004f, 420f, 40f)
+    // Where the shape is heading: the island asks for this when a panel takes
+    // over the edge, and the window is only torn down once the shape has
+    // actually finished shrinking
+    private var wanted = true
+
+    // The block at the current size setting, measured once in place()
+    private var blockW = 0f
+    private var blockH = 0f
+
+    private val baseFlags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+        WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+
     private val lp = WindowManager.LayoutParams(
-        1, 1, type,
-        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
-        PixelFormat.TRANSLUCENT,
+        1, 1, type, baseFlags, PixelFormat.TRANSLUCENT,
     ).apply {
         gravity = Gravity.TOP or Gravity.START
         title = "Tepi notch"
@@ -88,7 +121,6 @@ class Notch(
         private val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
         private val shape = Path()
         private val body = RectF()
-        private val radii = FloatArray(8)
 
         private var downX = 0f
         private var downY = 0f
@@ -98,40 +130,51 @@ class Notch(
             val w = width.toFloat()
             val h = height.toFloat()
             if (w <= 0f || h <= 0f) return
-            body.set(0f, 0f, w, h)
+            // The window is grown by the flare on each side and by the open
+            // spring's headroom; the block itself is the middle of it.
+            val f = ui.glassFlare
+            val k = grow.value.coerceIn(0f, 1f)
+            if (k <= 0.001f) return
+            // Closing is the shape shrinking back into the edge rather than
+            // fading: the length collapses towards the centre, the depth
+            // collapses towards the glass, and the radii follow the depth, so
+            // the block is a correct notch at every size on the way in and out
+            val len = blockW * k
+            val dep = blockH * k
+            if (len < 1f || dep < 1f) return
+            body.set(w / 2 - len / 2, 0f, w / 2 + len / 2, dep)
 
-            val cap = min(w, h) / 2f
-            // Both radii are fractions of the depth rather than fixed dp, so
-            // the silhouette keeps its proportions at every size the slider
-            // can ask for.
-            //
+            val cap = min(body.width(), body.height()) / 2f
             // The two free corners, hanging away from the glass, carry the
-            // real radius: they are the whole shape of the thing. The two on
-            // the glass get a lip — a right angle there is the one detail that
-            // gives a drawn shape away, since real hardware has a radius
-            // everywhere however tight, but anything larger than a lip opens a
-            // visible wedge of wallpaper between the curve and the bezel and
-            // then the block looks stuck on instead of cut out.
-            val r = min(h * RADIUS_K, cap)
-            val lip = min(h * LIP_K, cap)
+            // real radius: they are the whole silhouette of the thing.
+            val r = min(dep * CORNER, cap)
             shape.reset()
-            fillRadii(lip, lip, r, r)
-            shape.addRoundRect(body, radii, Path.Direction.CW)
+            shape.addRoundRect(body, r, r, Path.Direction.CW)
+            // ...and the two on the glass flare outwards instead of rounding
+            // inwards, so the block grows out of the bezel rather than sitting
+            // on top of it. The flare shrinks with the shape, so it is never
+            // wider than the block it is flaring from.
+            // The flare has to clear the depth as well as the half-length: a
+            // flare taller than the block it hangs off would reach past the
+            // block's own bottom edge and read as two legs rather than a join
+            ui.flare(shape, body, min(f * k, min(len / 2, dep)))
             canvas.drawPath(shape, bg)
 
-            // One eye, centred. Its height comes from the block's depth, which
-            // is now the short dimension and so the only one that can run out;
-            // the width follows the height, and the block is four times longer
-            // than it is deep, so the width never has to be checked at all.
-            eye.draw(canvas, body.centerX(), body.centerY(), eyeHeight(h), 1f)
-        }
-
-        // Corner radii clockwise from the top left, each corner one value
-        private fun fillRadii(tl: Float, tr: Float, br: Float, bl: Float) {
-            radii[0] = tl; radii[1] = tl
-            radii[2] = tr; radii[3] = tr
-            radii[4] = br; radii[5] = br
-            radii[6] = bl; radii[7] = bl
+            // The eyes, centred. Their height comes from the block's depth,
+            // which is the short dimension and so the only one that can run
+            // out; the pair's width follows that height.
+            //
+            // On their own fade, and clipped to the block. While the edge is
+            // being handed over in either direction the two shapes overlap —
+            // both black, so they read as one — and the face is what must not
+            // appear over the panel's content. The clip also means a shape
+            // that is still growing cannot leak an eye outside itself.
+            val la = look.value.coerceIn(0f, 1f)
+            if (la <= 0.01f) return
+            canvas.save()
+            canvas.clipPath(shape)
+            eye.draw(canvas, body.centerX(), body.centerY(), eyeHeight(blockH, blockW) * k, la)
+            canvas.restore()
         }
 
         // A tap, and only a tap.
@@ -172,19 +215,28 @@ class Notch(
 
     private val face = Face(context)
 
-    // How tall the eye is drawn, against the depth of the block it sits in.
+    // How tall each eye is drawn, against the block it sits in.
     //
-    // The ceiling is not the slider's top value. A fright grows the eye past
-    // its resting height, and the crescents reach further still — the scowl's
-    // floor bows below where the oval's edge would be — so the largest setting
-    // has to leave room for the biggest shape it is about to become, not for
-    // the calm one. The budget is EYE_ROOM of the depth for that worst case,
-    // and the two factors that make it up are asked of Eye rather than
-    // written out again here, so the two files cannot drift apart.
-    private fun eyeHeight(depth: Float): Float {
+    // Two ceilings, and neither is the slider's top value.
+    //
+    // The depth is the tight one. A fright grows the eyes past their resting
+    // height, and the crescents reach further still — the scowl's floor bows
+    // below where the oval's edge would be — so the largest setting has to
+    // leave room for the biggest shape it is about to become, not for the calm
+    // one. The factors that make that up are asked of Eye rather than written
+    // out again here, so the two files cannot drift apart.
+    //
+    // The length is the loose one, and it only exists because there are two
+    // eyes now: a pair is roughly three times as wide as one, which is still
+    // comfortable inside a block four times longer than it is deep, but the
+    // check costs nothing and a future smaller block would need it.
+    private fun eyeHeight(depth: Float, length: Float): Float {
         val scale = prefs.notchEye.coerceIn(Prefs.NOTCH_EYE_MIN, Prefs.NOTCH_EYE_MAX) / 100f
-        val ceiling = depth * EYE_ROOM / (Eye.MAX_GROWTH * Eye.MAX_EXTENT)
-        return min(depth * EYE_H * scale, ceiling)
+        val tall = depth * EYE_ROOM / (Eye.MAX_GROWTH * Eye.MAX_EXTENT)
+        // pairWidth is for one unit of height, so dividing gives the height
+        // the available length can afford
+        val long = length * EYE_SPAN / max(1f, eye.pairWidth(1f))
+        return min(depth * EYE_H * scale, min(tall, long))
     }
 
     @Suppress("DEPRECATION")
@@ -203,28 +255,67 @@ class Notch(
         val sig = "$rot:${m.widthPixels}:${m.heightPixels}:$size"
         if (!force && sig == placedFor) return
         placedFor = sig
-        val scale = size / 100f
-        // Wide and shallow, centred on the edge. Both dimensions are also
-        // capped against the screen, so a small or oddly shaped display gets a
-        // smaller notch rather than a bar across the top.
-        val length = min(ui.dp(LENGTH * scale), screenW * MAX_LONG)
-        val depth = min(ui.dp(DEPTH * scale), screenH * MAX_DEEP)
-        lp.width = max(1, length.toInt())
+        val length = length(ui, prefs, screenW)
+        val depth = depth(ui, prefs, screenH)
+        blockW = length
+        blockH = depth
+        // The window is the block plus a flare on each side, because the flare
+        // is drawn outside the block's own corners and a window sized to the
+        // block alone would clip it. Nothing else is added: the rest of the
+        // edge stays the system's.
+        val f = ui.glassFlare
+        val wide = length + f * 2
+        lp.width = max(1, wide.toInt())
         lp.height = max(1, depth.toInt())
-        lp.x = max(0, ((screenW - length) / 2f).toInt())
+        lp.x = max(0, ((screenW - wide) / 2f).toInt())
         lp.y = 0
+        lp.flags = flagsNow()
         if (attached) wm.updateViewLayout(face, lp)
+    }
+
+    // A shape on its way out stops taking touches.
+    //
+    // For the couple of hundred milliseconds it takes to shrink, this window
+    // is still stacked over the panel growing underneath it. Refusing the
+    // event in onTouchEvent is not enough: a window that has taken the touch
+    // down has taken it, and returning false only throws it away rather than
+    // passing it on. The flag is the only thing that makes the tap fall
+    // through to the island below.
+    private fun flagsNow() = baseFlags or
+        if (wanted) 0 else WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+
+    private fun retouch() {
+        if (!attached) return
+        val f = flagsNow()
+        if (lp.flags == f) return
+        lp.flags = f
+        try { wm.updateViewLayout(face, lp) } catch (_: Exception) { }
     }
 
     private var placedFor = ""
 
-    fun show() {
+    // Put the notch up.
+    //
+    // grown says the edge already has this shape on it, because the island
+    // just finished shrinking its own panel into it: the block is taken over
+    // as it stands and only the eyes fade in. Otherwise — a rotation, a switch
+    // flipped, an hour of quiet ending — there is nothing on the edge and the
+    // block grows out of the glass.
+    fun show(grown: Boolean) {
+        wanted = true
+        grow.target = 1f
+        look.target = 1f
         if (attached) {
             place(false)
+            retouch()
             kick()
             return
         }
         place(true)
+        // Arriving from nothing: start collapsed into the glass so the first
+        // frame is the shape opening rather than the shape appearing
+        grow.snap(if (grown) 1f else 0f)
+        look.snap(0f)
         try {
             wm.addView(face, lp)
             attached = true
@@ -236,7 +327,28 @@ class Notch(
         kick()
     }
 
+    // Shrink the notch back into the edge, and take the window down when it
+    // gets there. Asking twice is harmless; the window is only removed once.
+    fun close() {
+        if (!attached) { drop(); return }
+        if (!wanted) return
+        wanted = false
+        grow.target = 0f
+        look.target = 0f
+        retouch()
+        kick()
+    }
+
+    // Straight down, no animation: for teardown, where there is nobody left
+    // to watch the shape go
     fun hide() {
+        wanted = false
+        grow.snap(0f)
+        look.snap(0f)
+        drop()
+    }
+
+    private fun drop() {
         main.removeCallbacks(wake)
         if (!attached) return
         Choreographer.getInstance().removeFrameCallback(frame)
@@ -246,14 +358,16 @@ class Notch(
         placedFor = ""
     }
 
+
+
     fun battery(level: Int, charging: Boolean) {
         eye.battery(level, charging)
-        kick()
+        if (attached) kick()
     }
 
     // Something from another app arrived
     fun startled() {
-        if (!attached) return
+        if (!attached || !wanted) return
         eye.startled()
         kick()
     }
@@ -279,27 +393,64 @@ class Notch(
         if (!attached) { ticking = false; return }
         val dt = if (lastNs == 0L) 1f / 60f else ((ns - lastNs) / 1e9f).coerceIn(0f, 1f / 20f)
         lastNs = ns
-        val moving = eye.step(dt)
+        var moving = grow.step(dt)
+        moving = look.step(dt) or moving
+        // A shape on its way out has nothing to express, and stepping the eye
+        // through the exit would start a blink nobody can see
+        if (wanted) moving = eye.step(dt) or moving
         face.invalidate()
+        // Gone: take the window down rather than holding a surface open for a
+        // shape of zero size
+        if (!wanted && grow.value <= 0.01f) {
+            ticking = false
+            drop()
+            return
+        }
         if (moving) Choreographer.getInstance().postFrameCallback(frame)
         else {
             ticking = false
-            main.postDelayed(wake, eye.idleWait())
+            // A shape that is staying still is still on the blink timer
+            if (wanted) main.postDelayed(wake, eye.idleWait())
         }
     }
 
     companion object {
+        // The block's two dimensions, for whoever needs to know where the
+        // notch sits without owning one.
+        //
+        // The island asks for these in landscape: it collapses its own panel
+        // down to exactly this silhouette as it closes, so the panel shrinking
+        // away and the notch growing back are the same shape in the same place
+        // rather than two shapes swapping. One copy of the arithmetic, so they
+        // cannot disagree.
+        //
+        // Wide and shallow, and capped against the screen as well as the dp,
+        // so a small or oddly shaped display gets a smaller notch rather than
+        // a bar across the top.
+        fun length(ui: Ui, prefs: Prefs, screenW: Float): Float {
+            val scale = prefs.notchSize.coerceIn(Prefs.NOTCH_SIZE_MIN, Prefs.NOTCH_SIZE_MAX) / 100f
+            return min(ui.dp(LENGTH * scale), screenW * MAX_LONG)
+        }
+
+        fun depth(ui: Ui, prefs: Prefs, screenH: Float): Float {
+            val scale = prefs.notchSize.coerceIn(Prefs.NOTCH_SIZE_MIN, Prefs.NOTCH_SIZE_MAX) / 100f
+            return min(ui.dp(DEPTH * scale), screenH * MAX_DEEP)
+        }
+
+        // The two free corners, as a fraction of the depth: just under half,
+        // which is the roundest a pair of corners can be without meeting.
+        // Shared for the same reason the dimensions are — the island closes
+        // into this exact silhouette sideways. The two corners on the glass
+        // are not corners at all any more: they flare outwards, and that
+        // dimension lives in Ui because the panel uses the same one.
+        const val CORNER = 0.42f
+
         // The block at the hundred per cent setting: how far it hangs down from
         // the top edge, and how wide it is along it. The size slider scales
         // both together, so the silhouette is the same shape at every setting.
         private const val DEPTH = 26f
         private const val LENGTH = 100f
 
-        // Corner radii as fractions of the depth. The free pair is just under
-        // half the depth, which is the roundest a corner can be without the
-        // two of them meeting; the pair on the glass is a lip, no more.
-        private const val RADIUS_K = 0.42f
-        private const val LIP_K = 0.15f
 
         // Never more than this much of either edge, whatever the dp works out
         // to. Length is the one that matters — a block across a third of the
@@ -308,13 +459,16 @@ class Notch(
         private const val MAX_DEEP = 0.12f
 
         // Eye height against the block's own depth, at the hundred per cent
-        // setting. The eye is a tall oval, so its width is a fraction of this
-        // again and the length of the block is never tight; it is the depth
-        // that has to be budgeted.
-        private const val EYE_H = 0.48f
-        // The most of the depth the eye may take at its widest moment,
+        // setting. One eye of a pair, not the pair: the pair's width follows
+        // from it. Smaller than the single eye was, because two of them in the
+        // same depth want a little more air around them than one did.
+        private const val EYE_H = 0.44f
+        // The most of the depth the eyes may take at their widest moment,
         // whatever the slider says: the rest stays black, which is what makes
-        // it read as an eye in a notch rather than a notch full of eye.
+        // it read as eyes in a notch rather than a notch full of eye.
         private const val EYE_ROOM = 0.84f
+        // Same for the length. A pair needs checking against it where a single
+        // eye never did.
+        private const val EYE_SPAN = 0.82f
     }
 }

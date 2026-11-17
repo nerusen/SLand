@@ -168,10 +168,30 @@ class Eye(private val ui: Ui) {
         return moving
     }
 
-    // Centre, the eye's resting height, and the alpha of whatever is drawing
-    // it. The width follows the height, so one number sets the whole eye.
+    // A pair of eyes: centre of the face, the resting height of one eye, and
+    // the alpha. The width of each eye follows its height, and the gap between
+    // them follows it too, so one number still sets the whole face.
+    //
+    // Both eyes are drawn identically rather than independently. A pair that
+    // blinks or glares out of step is not a face being expressive, it is a
+    // face with something wrong with it; the two reading as one is the whole
+    // reason a pair is better than a single eye here.
     fun draw(c: Canvas, cx: Float, cy: Float, h: Float, a: Float) {
         if (h <= 0f || a <= 0.01f) return
+        val gap = h * size.value.coerceIn(0.5f, 2f) * GAP
+        one(c, cx - gap / 2, cy, h, a)
+        one(c, cx + gap / 2, cy, h, a)
+    }
+
+    // How wide a pair is in total, against the resting height of one eye: the
+    // gap between the two centres plus the widest either of them gets. The
+    // caller needs this to know whether a face fits where it is going, and
+    // working it back out of these constants on the other side of the call is
+    // how the two drift apart.
+    fun pairWidth(h: Float) = h * (GAP + WIDTH * MAX_SPREAD) * MAX_GROWTH
+
+    // One eye, in whatever shape the moods have settled on
+    private fun one(c: Canvas, cx: Float, cy: Float, h: Float, a: Float) {
         val k = size.value.coerceIn(0.5f, 2f)
         val full = h * k
         val w = full * WIDTH
@@ -280,6 +300,13 @@ class Eye(private val ui: Ui) {
         // Oval width over its height: taller than wide, the way Tepi's own
         // pair are drawn in the app
         private const val WIDTH = 0.62f
+        // Between the two eye centres, against the resting height of one. A
+        // shade wider than one eye, which is what keeps the pair reading as
+        // two eyes rather than as one wide blur.
+        private const val GAP = 0.86f
+        // The widest any single shape gets against the oval's own width: the
+        // happy crescent plus its puff. Used for the pair's total width.
+        private const val MAX_SPREAD = 1.70f
         // Thinnest the eye gets: a blink is a line, not nothing at all, as a
         // fraction of the height and as a hard floor in dp for the settings
         // where that fraction comes out under a pixel

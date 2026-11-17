@@ -130,7 +130,7 @@
     <string name="reads_radios">Membaca status Wi-Fi dan Bluetooth beserta nama koneksinya, untuk dua kolom di Beranda. Tidak ada yang keluar dari HP.</string>
     <string name="reads_shot">Membaca gambar terbaru di galeri untuk menampilkan kartu screenshot, serta beberapa yang terakhir untuk tab screenshot. Gambarnya tetap di HP; Tepi hanya menyerahkan satu ke aplikasi yang kamu pilih dari Bagikan, atau menyalinnya ke Rak saat kamu minta.</string>
     <string name="reads_code">Kode: %1$s</string>
-    <string name="reads_notch">Membaca level baterai dan orientasi layar, supaya mata di poni mode landscape bisa berkedip, melebar, dan menyipit menjadi bulan sabit merah. Mata itu hanya diberi tahu bahwa ada aplikasi lain mengirim sesuatu, bukan apa isinya atau siapa pengirimnya, dan tidak ada yang keluar dari HP.</string>
+    <string name="reads_notch">Membaca level baterai dan orientasi layar, supaya sepasang mata di poni mode landscape bisa berkedip, melebar, dan menyipit menjadi bulan sabit merah. Mata itu hanya diberi tahu bahwa ada aplikasi lain mengirim sesuatu, bukan apa isinya atau siapa pengirimnya, dan tidak ada yang keluar dari HP.</string>
     <string name="reads_never_title">Tidak pernah</string>
     <string name="reads_never">Tepi tidak pernah membaca kata sandi, ketikan, atau layar aplikasi, dan tidak punya analitik.</string>
     <string name="t_focus">Fokus</string>
@@ -429,7 +429,7 @@
     <!-- Poni mode landscape, dan mata di dalamnya -->
     <string name="notch">Mode landscape</string>
     <string name="notch_bar">Poni saat landscape</string>
-    <string name="notch_bar_sub">Saat HP dimiringkan, island tidak punya tempat untuk tampil, jadi berubah menjadi persegi panjang kecil bersudut halus yang menggantung di tengah tepi atas dengan satu mata di dalamnya. Mata itu berkedip, melebar saat ada notifikasi dari aplikasi lain, dan menyipit menjadi bulan sabit merah saat baterai hampir habis.</string>
+    <string name="notch_bar_sub">Saat HP dimiringkan, island tidak punya tempat untuk tampil, jadi berubah menjadi blok kecil yang menggantung di tengah tepi atas dengan sepasang mata di dalamnya. Mata itu berkedip, melebar saat ada notifikasi dari aplikasi lain, dan menyipit menjadi bulan sabit merah saat baterai hampir habis. Buka island di sini dan blok itu tumbuh menjadi panel; tutup, dan matanya kembali.</string>
     <string name="notch_tap">Ketuk membuka menu</string>
     <string name="notch_tap_on">Mengetuk poni akan membuka menu cepat island.</string>
     <string name="notch_tap_off">Mengetuk poni hanya membuat matanya tersenyum. Tidak ada yang terbuka, jadi game atau video tidak pernah terganggu.</string>

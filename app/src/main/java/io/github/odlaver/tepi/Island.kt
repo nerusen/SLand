@@ -111,9 +111,13 @@ class Island(
     // Landscape: a notch on the top edge instead of nothing at all
     private var notch: Notch? = null
     private var notchUp = false
+    // Set when the notch stood down for one of the island's own shapes, so the
+    // shape it left behind can be handed straight back
+    private var handover = false
 
     // Geometry, screen px
     private var screenW = 0f
+    private var screenH = 0f
     private val hole = RectF()
     private val pill = RectF()
     private var statusBottom = 0f
@@ -364,6 +368,7 @@ class Island(
         val m = DisplayMetrics()
         screen.getRealMetrics(m)
         screenW = m.widthPixels.toFloat()
+        screenH = m.heightPixels.toFloat()
         val cut = screen.cutout
         val top = cut?.boundingRectTop?.takeIf { !it.isEmpty }
         if (top != null) {
@@ -390,6 +395,22 @@ class Island(
         val bar = resources.getIdentifier("status_bar_height", "dimen", "android").let { if (it != 0) resources.getDimensionPixelSize(it) else 0 }
         statusBottom = max(pill.bottom, (cut?.safeInsetTop?.takeIf { it > 0 } ?: bar).toFloat())
         wingBase = max(pill.height() * 1.3f, ui.dp(36f))
+        // Sideways, the lens is on a side edge and means nothing: the island
+        // hangs from the middle of the top edge instead, which is where the
+        // notch hangs from too. The cradle becomes the notch's own silhouette,
+        // so a panel closing collapses into exactly the shape the notch is
+        // growing back into, and the two never have to be reconciled.
+        if (landscape) {
+            val nw = Notch.length(ui, prefs, screenW)
+            val nh = Notch.depth(ui, prefs, screenH)
+            val cx = screenW / 2
+            hole.set(cx - nw / 2, 0f, cx + nw / 2, nh)
+            pill.set(hole)
+            // No status bar to sit in out here, so content starts straight
+            // under the cradle
+            statusBottom = nh
+            wingBase = max(nh * 1.3f, ui.dp(36f))
+        }
     }
 
     private val landscape get() = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -402,16 +423,47 @@ class Island(
     // fullscreen app is exactly when the island itself is gone, and the notch
     // is what is left to say the phone is still awake.
     //
+    // One exception, and it is the whole reason this is not simply a switch:
+    // the notch stands down while the island itself has something on that
+    // edge. Both hang from the middle of the top edge in landscape, so two up
+    // at once is two black shapes overlapping. The notch is asked to close
+    // rather than told to disappear, and it shrinks back into the glass while
+    // the panel grows out of it — one edge, one motion, handed over.
+    //
     // The island's own hide switches still apply, because they are the user
     // saying "not now" rather than Android saying "not here": an hour of quiet
     // from the menu, and the lock screen when the lock screen is turned off,
     // put the notch away as well.
+    // Whether the notch is entitled to the top edge right now, regardless of
+    // what the island itself is doing with it. This is what the island closes
+    // into sideways: with the notch on, a panel shrinks down to the notch's
+    // own silhouette and hands it over, so the edge is never empty for a
+    // frame. With the notch off there is nothing to hand to, so the panel has
+    // to shrink to nothing instead — closing into a block that is about to
+    // vanish would be a shape that pops out of existence at the end.
+    private val notchAllowed get() = landscape && prefs.notchBar &&
+        hiddenUntil <= SystemClock.uptimeMillis() &&
+        !(locked && !prefs.bool("lockscreen", true))
+
     private fun syncNotch() {
-        val want = landscape && prefs.notchBar &&
-            hiddenUntil <= SystemClock.uptimeMillis() &&
-            !(locked && !prefs.bool("lockscreen", true))
+        val up = notchAllowed
+        // Nothing of the island's own on this edge
+        val want = up && kind == Kind.Hidden
         if (!want) {
-            if (notchUp) { notch?.hide(); notchUp = false }
+            if (notchUp) {
+                // Shrink it away rather than cutting it: the panel coming up
+                // is growing out of the same edge on the same spring, so the
+                // two read as one shape changing.
+                //
+                // Handover only when the island itself took the edge. The
+                // other reasons to stand down — the phone turned upright, the
+                // switch went off, the lock screen — leave nothing there, so
+                // the notch has to grow back from the glass next time rather
+                // than taking over a shape that is not on screen.
+                handover = up
+                notch?.close()
+                notchUp = false
+            }
             return
         }
         val n = notch ?: Notch(context, screen, type, prefs, ui) {
@@ -420,14 +472,25 @@ class Island(
             main.post { expand(menu) }
         }.also { notch = it }
         if (batteryLevel >= 0) n.battery(batteryLevel, batteryCharging)
-        n.show()
+        // The island's hidden landscape silhouette is the notch's block
+        // exactly, so a panel that has just closed leaves the right shape
+        // sitting on the edge and the notch takes it over instead of growing a
+        // second one inside it. The flag is consumed here: the next arrival
+        // after a rotation grows from nothing again.
+        n.show(grown = handover)
+        handover = false
         notchUp = true
     }
 
     // Widest shape that still keeps the lens in the middle. Clamping width
     // rather than nudging the shape sideways is what keeps every kind centred
     // on the same point, so nothing slides when one replaces another.
-    private val span get() = max(pill.width(), 2 * min(hole.centerX() - ui.edge, screenW - ui.edge - hole.centerX()))
+    //
+    // Sideways there is no lens to stay centred on and the shape hangs from
+    // the middle of the edge, so the whole screen less the margins is
+    // available and the cradle is no longer a floor on the width.
+    private val span get() = if (landscape) max(pill.width(), screenW - ui.edge * 2)
+        else max(pill.width(), 2 * min(hole.centerX() - ui.edge, screenW - ui.edge - hole.centerX()))
     private val wide get() = min(min(screenW - ui.edge * 2, ui.panelMax), span)
 
     private fun choose() {
@@ -495,8 +558,13 @@ class Island(
     // Recompute target, start motion
     override fun refresh() {
         if (!attached) return
-        syncNotch()
         choose()
+        // After choose, never before: the notch stands down for the island's
+        // own shapes, so it has to be told what this refresh decided rather
+        // than what the last one did. Asking first left the notch up for a
+        // whole cycle under an opening panel, and down for a whole cycle after
+        // a closing one.
+        syncNotch()
         pageList = if (opened != null) pages() else emptyList()
         if (kind != Kind.Panel || opened == null) navOff()
         // Both strips are positioned by drawTabs, which only runs for an open
@@ -542,6 +610,32 @@ class Island(
                 sy = statusBottom; rb = ui.radiusPanel
             }
         }
+        // Sideways there is no lens and no neck: one block hanging from the
+        // top edge, which grows and shrinks between the notch's own silhouette
+        // and a full panel. The top edge never moves — it is the glass — so the
+        // open and close animation is entirely width, height and the two
+        // bottom corners, which is the same handful of springs the portrait
+        // shape morphs with.
+        if (landscape) {
+            top = 0f
+            nk = w
+            sy = 0f
+            rt = 0f
+            if (kind == Kind.Hidden) {
+                // Closing. With the notch on, stop at its silhouette and hand
+                // it over; with the notch off, carry on down to nothing, since
+                // there is nothing out here to hand to.
+                if (notchAllowed) {
+                    w = hole.width()
+                    bottom = hole.height()
+                    rb = hole.height() * Notch.CORNER
+                } else {
+                    w = 0f
+                    bottom = 0f
+                    rb = 0f
+                }
+            }
+        }
         // Clamping the width keeps the shape centred; offsetting it would not
         w = w.coerceIn(0f, span)
         target.set(cx - w / 2, top, cx + w / 2, bottom)
@@ -566,12 +660,19 @@ class Island(
         kick()
     }
 
-    private fun hotspot() = touchable && prefs.cameraTap
+    private fun hotspot() = touchable && prefs.cameraTap && !landscape
 
     // The resting capsule sits in the status bar. Only the accessibility
     // window may take touches up there; an app overlay would swallow part of
     // the pull-down gesture for as long as the capsule is up, so it stays
     // untouchable and purely visual instead.
+    //
+    // Sideways, the hidden island is parked on the notch's own silhouette,
+    // which means the two windows are stacked on the same few square
+    // centimetres of glass. Only one of them can have the tap, and it has to
+    // be the notch: it is the thing that is actually visible there, and the
+    // notch's switch decides whether a tap opens anything at all. So hotspot
+    // is off in landscape and the hidden island takes nothing.
     private fun wantsTouch() = when (kind) {
         Kind.Hidden, Kind.Idle -> hotspot()
         else -> true
@@ -580,11 +681,15 @@ class Island(
     // Window covers the moving shape only
     private fun place(rect: RectF, touch: Boolean) {
         val grow = if (touch && (kind == Kind.Hidden || kind == Kind.Idle)) ui.s8 else 0f
-        val x = (rect.left - grow).toInt() - 2
+        // Sideways the shape flares outside its own box at the top corners, so
+        // the window has to carry that much slack on each side or the flare is
+        // clipped off at exactly the join it exists to hide
+        val side = grow + if (landscape) ui.glassFlare else 0f
+        val x = (rect.left - side).toInt() - 2
         val y = max(0, (rect.top - grow).toInt() - 2)
         lp.x = x
         lp.y = y
-        lp.width = max(1, (rect.right + grow).toInt() + 2 - x)
+        lp.width = max(1, (rect.right + side).toInt() + 2 - x)
         lp.height = max(1, (rect.bottom + grow).toInt() + 2 - y)
         lp.flags = baseFlags or if (touch) 0 else WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
         if (attached) wm.updateViewLayout(this, lp)
@@ -635,7 +740,11 @@ class Island(
 
     private fun settle() {
         when (kind) {
-            Kind.Hidden -> place(if (hotspot()) pill else hole, hotspot())
+            // Sideways a hidden island is parked on the notch's silhouette,
+            // which the notch itself is now drawing: the window shrinks to
+            // nothing rather than holding a surface over it
+            Kind.Hidden -> if (landscape) place(target, false)
+            else place(if (hotspot()) pill else hole, hotspot())
             Kind.Idle -> place(target, wantsTouch())
             else -> {
                 val rect = RectF(target)
@@ -833,6 +942,19 @@ class Island(
         // Keep content off the rounded ends
         val inset = max(ui.dp(7f), (pill.height() - ui.dp(22f)) / 2)
         val side = max(inset, pill.height() * 0.42f)
+        // Sideways there is no lens to work around, so the two zones meet in
+        // the middle instead of parting around a hole. Measured from the
+        // shape's own band rather than the cradle: out here the cradle is the
+        // notch's silhouette, and insetting from it the way portrait does
+        // would hand back a pair of inverted rectangles.
+        if (landscape) {
+            val pad = max(ui.dp(6f), at.height() * 0.18f)
+            val top = at.top + pad
+            val bottom = max(top, min(at.bottom, hole.bottom) - pad)
+            zoneL.set(at.left + side, top, at.centerX(), bottom)
+            zoneR.set(at.centerX(), top, at.right - side, bottom)
+            return
+        }
         zoneL.set(left + side, pill.top + inset, hole.left - ui.s12, pill.bottom - inset)
         zoneR.set(hole.right + ui.s12, pill.top + inset, left + nk - side, pill.bottom - inset)
     }
@@ -842,6 +964,20 @@ class Island(
         out.reset()
         val w = now.width()
         val cx = now.centerX()
+        // Sideways: one block on the glass, with the top two corners flared
+        // outwards instead of rounded. The flare is what makes it read as part
+        // of the bezel rather than a card lying on top of the screen, and it
+        // is the same curve the neck uses where it meets the body, only turned
+        // to face the edge. It shrinks with the shape so a closing panel never
+        // flares wider than the block it is leaving behind.
+        if (landscape) {
+            if (w < 1f || now.height() < 1f) return
+            val r = min(radB.value, min(w, now.height()) / 2)
+            box.set(now.left, 0f, now.right, now.bottom)
+            out.addRoundRect(box, r, r, Path.Direction.CW)
+            ui.flare(out, box, min(ui.glassFlare, min(w / 2, now.height())))
+            return
+        }
         val nk = neck.value.coerceIn(0f, w)
         val sy = split.value.coerceIn(now.top, now.bottom)
         if (w - nk < 1f || sy - now.top < 1f || now.bottom - sy < 1f) {
@@ -1004,7 +1140,10 @@ class Island(
                 else primary?.let { if (!it.tapCompact()) expand(it) }
             }
             Kind.Panel -> {
-                // Neck around the camera toggles closed
+                // The band the shape grew out of toggles it closed again: the
+                // neck around the lens in portrait, the notch's own silhouette
+                // sideways. Both are the strip above statusBottom, and neither
+                // is ever scene content.
                 if (y < statusBottom) { if (opened != null) collapse() else primary?.dismiss() }
                 else {
                     armClose()
