@@ -59,6 +59,8 @@ class Listener : NotificationListenerService() {
     lateinit var agenda: Agenda
     lateinit var pc: Pc
     private lateinit var watch: Watch
+    lateinit var radios: Radios
+    lateinit var github: Github
     private var briefs: BriefScene? = null
     private var privacyScene: PrivacyScene? = null
     private var timerScene: TimerScene? = null
@@ -77,6 +79,8 @@ class Listener : NotificationListenerService() {
         agenda = Agenda(this, prefs, changed = { island?.refresh() }, classSoon = { classSoon(it) })
         pc = Pc(this, agenda.vault, prefs) { island?.refresh() }
         pc.onFile = { name, uri -> fromLaptop(name, uri) }
+        radios = Radios(this) { island?.refresh() }
+        github = Github(this, agenda.vault) { island?.refresh() }
         live = Live(this, prefs, { n, pkg -> n.getLargeIcon()?.loadDrawable(this)?.let { bitmap(it) } ?: appIcon(pkg) }) { island?.refresh() }
         watch = Watch(this, prefs, brief = { k, t -> briefs?.show(k, t) }, lowBattery = { lowBattery(it) }, battery = { l, c ->
             pc.battery(l, c)
@@ -101,6 +105,8 @@ class Listener : NotificationListenerService() {
             watch.start()
             agenda.start()
             pc.start()
+            radios.start()
+            github.start()
             try { activeNotifications?.forEach { live.posted(it) } } catch (_: Exception) { }
             ensureIsland()
         } else {
@@ -110,6 +116,8 @@ class Listener : NotificationListenerService() {
             watch.stop()
             agenda.stop()
             pc.stop()
+            radios.stop()
+            github.stop()
             live.clear()
         }
         Tile.refresh(this)
@@ -132,6 +140,8 @@ class Listener : NotificationListenerService() {
         watch.stop()
         agenda.stop()
         pc.stop()
+        radios.stop()
+        github.stop()
         live.clear()
         media?.stop()
         media = null
@@ -200,9 +210,10 @@ class Listener : NotificationListenerService() {
         isl.home.rows.add(TaskRow(isl, agenda, agendaTab))
         isl.home.rows.add(NoteRow(isl, notes) { open(Items::class.java, Items.NOTES) })
         isl.home.rows.add(ShelfRow(isl, shelf) { picked(it) })
+        // Last on Home, where the old button strip was
+        isl.home.rows.add(io.github.odlaver.tepi.scene.RadioTiles(isl, radios))
+        isl.register(io.github.odlaver.tepi.scene.GithubTab(isl, github) { section(Section.CONNECT) })
         isl.homeExtras.add { if (Access.paused(this)) Action(getString(R.string.perm_access), primary = true, icon = Icon.Hand) { Access.openSettings(this) } else null }
-        isl.homeExtras.add { if (!timers.active) Action(getString(R.string.t_focus_n, 25), primary = true, icon = Icon.Timer) { timers.focus(25) } else null }
-        isl.homeExtras.add { Action(getString(R.string.note_new), icon = Icon.Note, personal = true) { newNote() } }
         isl.menuExtras.add { Action(getString(R.string.t_timer), icon = Icon.Timer) { isl.expand(ts) } }
         isl.menuExtras.add { Access.instance?.let { a -> Action(getString(R.string.bank_mode), icon = Icon.Shield) { a.stepAside(null) } } }
         isl.menuExtras.add { Action(getString(R.string.note_new), icon = Icon.Note, personal = true) { newNote() } }

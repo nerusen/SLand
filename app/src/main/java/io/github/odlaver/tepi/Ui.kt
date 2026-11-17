@@ -58,6 +58,7 @@ class Ui(context: Context) {
     val bodyInk = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = ink; textSize = sp(12f) }
     val small = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = faint; textSize = sp(10f); fontFeatureSettings = "tnum" }
     val label = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = ink; textSize = sp(12f); typeface = Typeface.DEFAULT_BOLD }
+    val bodyDark = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(170, 0, 0, 0); textSize = sp(12f) }
     val labelDark = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK; textSize = sp(12f); typeface = Typeface.DEFAULT_BOLD }
     val compact = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = ink; textSize = sp(12f); typeface = Typeface.DEFAULT_BOLD; fontFeatureSettings = "tnum" }
     val lyric = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = ink; textSize = sp(12.5f); typeface = Typeface.DEFAULT_BOLD }

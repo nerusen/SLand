@@ -210,7 +210,7 @@
     <string name="g_up">Geser ke atas</string>
     <string name="g_up_sub">Menutup panel atau membuang aktivitas.</string>
     <string name="g_hold">Tahan</string>
-    <string name="g_hold_sub">Menu cepat: timer, catatan, sembunyikan, pengaturan.</string>
+    <string name="g_hold_sub">Menu cepat: timer, catatan, sembunyikan, pengaturan. Di Beranda, menahan kolom Wi-Fi atau Bluetooth membuka setelan tersebut.</string>
     <string name="g_side">Geser ke samping</string>
     <string name="g_side_sub">Pindah antar-aktivitas yang hidup dan Beranda.</string>
     <string name="messages">Pesan</string>
@@ -348,4 +348,27 @@
     <string name="bank_stepped_any">Aksesibilitas mati, aplikasi bank bisa dibuka. Nyalakan lagi dari Tepi setelah selesai.</string>
     <string name="perm_access_on">Membuka aplikasi bank akan mematikan ini. Untuk aplikasi lain, tahan island lalu pilih Mode bank.</string>
     <string name="perm_access_paused">Mati karena aplikasi bank. Nyalakan lagi setelah selesai.</string>
+    <string name="wifi">Wi-Fi</string>
+    <string name="bluetooth">Bluetooth</string>
+    <string name="percent">%1$d%%</string>
+    <string name="radio_names">Nama koneksi</string>
+    <string name="radio_names_sub">Android menyembunyikan nama Wi-Fi dan Bluetooth dari aplikasi tanpa izin lokasi dan perangkat sekitar. Tanpa izin itu kolomnya tetap berfungsi, hanya saja bertuliskan Wi-Fi dan Bluetooth.</string>
+    <string name="radio_names_on">Kolom di Beranda bisa menyebut nama koneksi Anda.</string>
+    <string name="nav_always">Navigasi selalu tampil</string>
+    <string name="nav_always_on">Baris ikon tetap tampil selama panel terbuka.</string>
+    <string name="nav_always_off">Baris ikon muncul saat berpindah halaman, lalu menghilang. Ketuk dots untuk memanggilnya.</string>
+    <string name="github">GitHub</string>
+    <string name="github_title">GitHub</string>
+    <string name="github_how">Token dari GitHub › Settings › Developer settings › Personal access tokens, dengan read:user.</string>
+    <string name="github_sub">Kalender kontribusi Anda, pada tab sendiri.</string>
+    <string name="github_empty">Tambahkan token untuk melihat kontribusi Anda.</string>
+    <string name="github_loading">Memuat kontribusi…</string>
+    <string name="github_failed">Tidak bisa menghubungi GitHub</string>
+    <string name="github_total">%1$d tahun ini</string>
+    <string name="github_less">Sedikit</string>
+    <string name="github_more">Banyak</string>
+    <plurals name="github_day">
+        <item quantity="one">%1$d kontribusi pada %2$s</item>
+        <item quantity="other">%1$d kontribusi pada %2$s</item>
+    </plurals>
 </resources>

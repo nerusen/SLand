@@ -58,6 +58,12 @@ class Prefs(context: Context) {
         get() = int("idle.width", IDLE_WIDTH_DEFAULT)
         set(v) = set("idle.width", v)
 
+    // Tab bar in an open panel: pinned up, or shown on a page change and
+    // stepped back after a few seconds. Automatic by default.
+    var navAlways: Boolean
+        get() = bool("nav.always", false)
+        set(v) = set("nav.always", v)
+
     companion object {
         const val OFFSET_MIN = -8
         const val OFFSET_MAX = 24

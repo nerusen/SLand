@@ -155,7 +155,11 @@ class Island(
     private var lastTouch = 0L
     private var batteryLevel = -1
     private var batteryCharging = false
-    private var navShown = false
+    // Set by navOn and navOff in the automatic mode
+    private var navAuto = false
+    // The user may pin the bar up instead; then there is nothing to toggle
+    // and nothing to time out
+    private val navShown get() = prefs.navAlways || navAuto
     private var navHideAt = 0L
     private var navCell = 0f
     private val dotsHit = RectF()
@@ -299,7 +303,6 @@ class Island(
     private fun homeActions(): List<Action> {
         val out = ArrayList<Action>()
         for (f in homeExtras) f()?.let { out.add(it) }
-        out.add(Action(context.getString(R.string.settings), icon = Icon.Gear, personal = true) { open(Intent(context, MainActivity::class.java)); collapse() })
         return out.filter { !(locked && it.personal) }.take(3)
     }
 
@@ -425,21 +428,22 @@ class Island(
 
     // Shown on a page change or a tap on the dots, then it steps back out
     private fun navOn() {
-        navShown = true
+        if (prefs.navAlways) return
+        navAuto = true
         navHideAt = SystemClock.uptimeMillis() + NAV_MS
         main.removeCallbacks(hideNav)
         main.postDelayed(hideNav, NAV_MS)
     }
 
     private fun navOff() {
-        if (!navShown) return
-        navShown = false
+        if (!navAuto) return
+        navAuto = false
         navBar.setEmpty()
         main.removeCallbacks(hideNav)
     }
 
     private val hideNav = Runnable {
-        if (navShown && SystemClock.uptimeMillis() >= navHideAt - 100) { navOff(); refresh() }
+        if (navAuto && SystemClock.uptimeMillis() >= navHideAt - 100) { navOff(); refresh() }
     }
 
     // Recompute target, start motion
@@ -728,6 +732,7 @@ class Island(
         "agent" -> Icon.Laptop
         "alert" -> Icon.Bell
         "menu" -> Icon.Layers
+        "github" -> Icon.Github
         else -> Icon.Layers
     }
 
@@ -820,11 +825,20 @@ class Island(
     private var downY = 0f
     private var pressed = false
     private var acted = false
+    // A hold inside an open panel goes to what is under the finger first.
+    // Home's Wi-Fi and Bluetooth tiles use it for their settings pages, and
+    // the quick menu opening on top of them would be the clash, so the menu
+    // only comes up when the scene does not take the hold. The neck around
+    // the camera is never scene content, so a hold there is always the menu.
     private val longPress = Runnable {
         if (pressed && !acted) {
             acted = true
             performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-            expand(menu)
+            val s = primary
+            val inScene = kind == Kind.Panel && s != null && downY >= statusBottom &&
+                !navBar.contains(downX, downY) && !dotsHit.contains(downX, downY)
+            if (inScene && s?.hold(downX, downY) == true) { armClose(); refresh() }
+            else expand(menu)
         }
     }
 
@@ -933,9 +947,10 @@ class Island(
                         navTap(x, y) -> Unit
                         // The dots are the handle for the bar: tap to call it
                         // up, tap again to put it away
-                        dotsHit.contains(x, y) && pageList.size > 1 -> {
+                        // Pinned up, the dots have nothing to do
+                        dotsHit.contains(x, y) && pageList.size > 1 && !prefs.navAlways -> {
                             haptic()
-                            if (navShown) navOff() else navOn()
+                            if (navAuto) navOff() else navOn()
                         }
                         else -> primary?.tap(x, y)
                     }

@@ -66,6 +66,10 @@ abstract class Scene(protected val host: Host) {
     open fun tap(x: Float, y: Float) = false
     open fun tapCompact() = false
 
+    // Press and hold inside the open panel. True when the scene takes it; the
+    // island's quick menu only opens when nothing under the finger did.
+    open fun hold(x: Float, y: Float) = false
+
     open fun dismiss() {}
 
     // Needs frames while shown

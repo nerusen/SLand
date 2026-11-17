@@ -213,7 +213,7 @@
     <string name="g_up">Swipe up</string>
     <string name="g_up_sub">Closes the panel or dismisses the activity.</string>
     <string name="g_hold">Press and hold</string>
-    <string name="g_hold_sub">Quick menu: timer, note, hide, settings.</string>
+    <string name="g_hold_sub">Quick menu: timer, note, hide, settings. On Home, holding a Wi-Fi or Bluetooth tile opens that page instead.</string>
     <string name="g_side">Swipe sideways</string>
     <string name="g_side_sub">Switches between live activities and Home.</string>
     <string name="messages">Messages</string>
@@ -351,4 +351,27 @@
     <string name="bank_stepped_any">Accessibility is off, banking apps can open. Turn it on again from Tepi when you\’re done.</string>
     <string name="perm_access_on">Opening a banking app turns this off. Hold the island and pick Bank mode for other apps.</string>
     <string name="perm_access_paused">Off for a banking app. Turn it on again when you\’re done.</string>
+    <string name="wifi">Wi-Fi</string>
+    <string name="bluetooth">Bluetooth</string>
+    <string name="percent">%1$d%%</string>
+    <string name="radio_names">Network names</string>
+    <string name="radio_names_sub">Android hides the Wi-Fi and Bluetooth names from apps without location and nearby-device access. Without it the tiles still work, they just read Wi-Fi and Bluetooth.</string>
+    <string name="radio_names_on">Home’s tiles can name what you’re connected to.</string>
+    <string name="nav_always">Keep the tab bar up</string>
+    <string name="nav_always_on">The icon row stays on screen while a panel is open.</string>
+    <string name="nav_always_off">The icon row appears when you change page, then steps back. Tap the dots to call it up.</string>
+    <string name="github">GitHub</string>
+    <string name="github_title">GitHub</string>
+    <string name="github_how">Token from GitHub › Settings › Developer settings › Personal access tokens, with read:user.</string>
+    <string name="github_sub">Your contribution calendar, on its own tab.</string>
+    <string name="github_empty">Add a token to see your contributions.</string>
+    <string name="github_loading">Loading contributions…</string>
+    <string name="github_failed">Could not reach GitHub</string>
+    <string name="github_total">%1$d this year</string>
+    <string name="github_less">Less</string>
+    <string name="github_more">More</string>
+    <plurals name="github_day">
+        <item quantity="one">%1$d contribution on %2$s</item>
+        <item quantity="other">%1$d contributions on %2$s</item>
+    </plurals>
 </resources>

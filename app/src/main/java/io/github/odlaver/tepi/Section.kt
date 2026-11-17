@@ -35,7 +35,10 @@ class Section : Page() {
             prefs.idleWidthDp = it
             changed()
         }
-        toggle(g, getString(R.string.camera_tap), getString(if (a11y()) R.string.camera_tap_sub else R.string.camera_tap_off), prefs.cameraTap, a11y(), Icon.Camera) {
+        toggle(g, getString(R.string.nav_always), getString(if (prefs.navAlways) R.string.nav_always_on else R.string.nav_always_off), prefs.navAlways, icon = Icon.Tasks) {
+            prefs.navAlways = it; changed(); rebuild()
+        }
+                toggle(g, getString(R.string.camera_tap), getString(if (a11y()) R.string.camera_tap_sub else R.string.camera_tap_off), prefs.cameraTap, a11y(), Icon.Camera) {
             prefs.cameraTap = it; changed()
         }
         toggle(g, getString(R.string.lockscreen), getString(R.string.lockscreen_sub), prefs.bool("lockscreen", true), icon = Icon.Shield) {
@@ -46,7 +49,12 @@ class Section : Page() {
             changed()
             Listener.instance?.test()
         }
-        label(getString(R.string.gestures))
+        // Names in Home's Wi-Fi and Bluetooth tiles. Optional: the tiles work
+        // without them, they just say Wi-Fi and Bluetooth.
+        val need = Radios.missing(this)
+        row(g, getString(R.string.radio_names), getString(if (need.isEmpty()) R.string.radio_names_on else R.string.radio_names_sub),
+            if (need.isEmpty()) null else button(getString(R.string.grant)) { requestPermissions(need, REQ_RADIOS) }, Icon.Wifi)
+                label(getString(R.string.gestures))
         val h = group()
         for ((t, d, i) in listOf(
             Triple(R.string.g_tap, R.string.g_tap_sub, Icon.Hand),
@@ -192,6 +200,9 @@ class Section : Page() {
             })
         }
 
+        // GitHub token: the contribution calendar tab
+        github()
+
         // iCal feeds
         label(getString(R.string.calendar))
         val c = group()
@@ -208,6 +219,27 @@ class Section : Page() {
         }
         laptop()
         note(getString(R.string.connect_privacy))
+    }
+
+    // Classic token with read:user, or a fine-grained one; the calendar is
+    // the token owner's own, so every user wires up their own profile
+    private fun github() {
+        val gh = Listener.instance?.github ?: return
+        label("GitHub")
+        val g = group()
+        if (gh.linked) {
+            row(g, gh.login.ifEmpty { getString(R.string.connected) }, getString(R.string.github_sub), button(getString(R.string.disconnect), false) {
+                gh.save(null); rebuild()
+            }, Icon.Github)
+            return
+        }
+        row(g, getString(R.string.github_title), getString(R.string.github_how), icon = Icon.Github)
+        val f = field(getString(R.string.token), secret = true)
+        form(g, f, button(getString(R.string.save)) {
+            val tok = f.text.toString().trim()
+            if (tok.isEmpty()) return@button
+            work({ Github.fetch(tok) }) { cal -> if (cal != null) { gh.save(tok); rebuild() } else toast(getString(R.string.token_bad)) }
+        })
     }
 
     // Tepi on Windows: approve agents from here
@@ -275,7 +307,16 @@ class Section : Page() {
         }
     }
 
+    override fun onRequestPermissionsResult(code: Int, perms: Array<out String>, results: IntArray) {
+        super.onRequestPermissionsResult(code, perms, results)
+        if (code != REQ_RADIOS) return
+        // Fresh names for the tiles, and the row's own state
+        Listener.instance?.let { it.radios.stop(); it.radios.start() }
+        rebuild()
+    }
+
     companion object {
+        private const val REQ_RADIOS = 7
         const val MODE = "mode"
         const val LINK = "link"
         const val ISLAND = "island"

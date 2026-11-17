@@ -16,11 +16,22 @@ interface HomeRow {
     fun height(w: Float): Float
     fun draw(c: Canvas, r: RectF, a: Float)
     fun tap(x: Float, y: Float) = false
+    // Press and hold; true when the row claims it, so the island's quick
+    // menu does not open over it
+    fun hold(x: Float, y: Float) = false
+    // Drawn straight onto the panel, with no row card behind it: for rows
+    // that are cards themselves
+    fun bare() = false
 }
 
 class Action(val label: String, val primary: Boolean = false, val icon: io.github.odlaver.tepi.Icon? = null, val personal: Boolean = false, val run: () -> Unit)
 
-// Opened on demand: camera tap, tile, shortcut
+// Opened on demand: camera tap, tile, shortcut.
+//
+// No button strip at the bottom any more: Focus, New note and Settings all
+// have a quicker way in now, through the tab bar's pages and its gear, so the
+// strip only cost height. The one action that still matters, turning the
+// accessibility service back on after a banking app paused it, stays.
 class HomeScene(host: Host, private val actions: () -> List<Action>) : Scene(host) {
     override val id = "home"
     val rows = ArrayList<HomeRow>()
@@ -39,7 +50,7 @@ class HomeScene(host: Host, private val actions: () -> List<Action>) : Scene(hos
 
     override fun panelHeight(w: Float): Float {
         var h = header()
-        for (row in rows) if (shows(row)) h += ui.s8 + row.height(w - ui.s24) + ui.s20
+        for (row in rows) if (shows(row)) h += ui.s8 + if (row.bare()) row.height(w) else row.height(w - ui.s24) + ui.s20
         if (actions().isNotEmpty()) h += ui.s12 + ui.btnH
         return h
     }
@@ -67,6 +78,14 @@ class HomeScene(host: Host, private val actions: () -> List<Action>) : Scene(hos
         for (row in rows) {
             if (!shows(row)) continue
             y += ui.s8
+            if (row.bare()) {
+                val h = row.height(r.width())
+                val box = RectF(r.left, y, r.right, y + h)
+                row.draw(c, box, a)
+                placed.add(box to row)
+                y += h
+                continue
+            }
             val h = row.height(r.width() - ui.s24) + ui.s20
             val box = RectF(r.left, y, r.right, y + h)
             ui.fill(c, box, ui.radiusRow, ui.fill, a)
@@ -91,6 +110,11 @@ class HomeScene(host: Host, private val actions: () -> List<Action>) : Scene(hos
     override fun tap(x: Float, y: Float): Boolean {
         for ((r, act) in hits) if (r.contains(x, y)) { host.haptic(); act.run(); return true }
         for ((r, row) in placed) if (r.contains(x, y)) return row.tap(x, y)
+        return false
+    }
+
+    override fun hold(x: Float, y: Float): Boolean {
+        for ((r, row) in placed) if (r.contains(x, y)) return row.hold(x, y)
         return false
     }
 }

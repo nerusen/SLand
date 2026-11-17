@@ -11,7 +11,8 @@ import android.graphics.drawable.Drawable
 enum class Icon {
     Play, Pause, Next, Prev, Stop, Plus, Check, Close, Timer, Note, Gear, Home, Hide, Copy, Share, Open, Reply,
     Flag, Music, Lyrics, Bell, Moon, Drop, Eye, Stretch, Bolt, Phone, Headphones, Download, Nav, Camera, Shield,
-    Book, Tasks, Shelf, Info, Code, User, Battery, Layers, Hand, Power, Chat, Link, Pin, Trash, Laptop, Globe, Coffee, Chevron, Spark
+    Book, Tasks, Shelf, Info, Code, User, Battery, Layers, Hand, Power, Chat, Link, Pin, Trash, Laptop, Globe, Coffee, Chevron, Spark,
+    Wifi, Bluetooth, Github
 }
 
 // Line icons on a 24-unit grid, drawn with the Ink stroke
@@ -105,6 +106,33 @@ object Icons {
             Icon.Coffee -> { poly(c, 4f, 9f, 16f, 9f, 15f, 19f, 5f, 19f, close = true); path.reset(); path.moveTo(16f, 11f); path.quadTo(20.5f, 11f, 20.5f, 13.5f); path.quadTo(20.5f, 16f, 15.5f, 16f); c.drawPath(path, p); ln(c, 8f, 3.5f, 8f, 6f); ln(c, 12f, 3.5f, 12f, 6f) }
             Icon.Chevron -> poly(c, 9f, 5f, 16f, 12f, 9f, 19f)
             Icon.Spark -> { ln(c, 12f, 3f, 12f, 21f); ln(c, 3f, 12f, 21f, 12f); ln(c, 6f, 6f, 18f, 18f); ln(c, 18f, 6f, 6f, 18f) }
+            // Three quarter-arcs around the dot they fan out from
+            Icon.Wifi -> {
+                for (rad in floatArrayOf(4.5f, 9f, 13.5f)) { r.set(12f - rad, 19.5f - rad, 12f + rad, 19.5f + rad); c.drawArc(r, 225f, 90f, false, p) }
+                fill(); c.drawCircle(12f, 19.5f, 1.4f, p)
+            }
+            // The rune, drawn as one stroke
+            Icon.Bluetooth -> poly(c, 6.5f, 7.5f, 17f, 16.5f, 12f, 21f, 12f, 3f, 17f, 7.5f, 6.5f, 16.5f)
+            // GitHub's mark, from simple-icons' github.svg on the same 24 grid.
+            // It is a solid brand mark, so it is filled rather than stroked.
+            Icon.Github -> {
+                fill()
+                path.reset()
+                path.moveTo(12f, 0.297f); path.cubicTo(5.37f, 0.297f, 0f, 5.67f, 0f, 12.297f); path.cubicTo(0f, 17.6f, 3.438f, 22.097f, 8.205f, 23.682f)
+                path.cubicTo(8.805f, 23.795f, 9.025f, 23.424f, 9.025f, 23.105f); path.cubicTo(9.025f, 22.82f, 9.015f, 22.065f, 9.01f, 21.065f)
+                path.cubicTo(5.672f, 21.789f, 4.968f, 19.455f, 4.968f, 19.455f); path.cubicTo(4.422f, 18.07f, 3.633f, 17.7f, 3.633f, 17.7f)
+                path.cubicTo(2.546f, 16.956f, 3.717f, 16.971f, 3.717f, 16.971f); path.cubicTo(4.922f, 17.055f, 5.555f, 18.207f, 5.555f, 18.207f)
+                path.cubicTo(6.625f, 20.042f, 8.364f, 19.512f, 9.05f, 19.205f); path.cubicTo(9.158f, 18.429f, 9.467f, 17.9f, 9.81f, 17.6f)
+                path.cubicTo(7.145f, 17.3f, 4.344f, 16.268f, 4.344f, 11.67f); path.cubicTo(4.344f, 10.36f, 4.809f, 9.29f, 5.579f, 8.45f)
+                path.cubicTo(5.444f, 8.147f, 5.039f, 6.927f, 5.684f, 5.274f); path.cubicTo(5.684f, 5.274f, 6.689f, 4.952f, 8.984f, 6.504f)
+                path.cubicTo(9.944f, 6.237f, 10.964f, 6.105f, 11.984f, 6.099f); path.cubicTo(13.004f, 6.105f, 14.024f, 6.237f, 14.984f, 6.504f)
+                path.cubicTo(17.264f, 4.952f, 18.269f, 5.274f, 18.269f, 5.274f); path.cubicTo(18.914f, 6.927f, 18.509f, 8.147f, 18.389f, 8.45f)
+                path.cubicTo(19.154f, 9.29f, 19.619f, 10.36f, 19.619f, 11.67f); path.cubicTo(19.619f, 16.28f, 16.814f, 17.295f, 14.144f, 17.59f)
+                path.cubicTo(14.564f, 17.95f, 14.954f, 18.686f, 14.954f, 19.81f); path.cubicTo(14.954f, 21.416f, 14.939f, 22.706f, 14.939f, 23.096f)
+                path.cubicTo(14.939f, 23.411f, 15.149f, 23.786f, 15.764f, 23.666f); path.cubicTo(20.565f, 22.092f, 24f, 17.592f, 24f, 12.297f)
+                path.cubicTo(24f, 5.67f, 18.627f, 0.297f, 12f, 0.297f); path.close()
+                c.drawPath(path, p)
+            }
         }
         line()
     }
