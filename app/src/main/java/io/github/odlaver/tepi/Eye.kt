@@ -21,15 +21,24 @@ import kotlin.math.sin
 //
 //   Calm      the resting oval, blinking every seven seconds
 //   Startled  a notification from another app: the eye widens, then settles
-//   Angry     the battery is nearly gone: the eye goes red and gains a brow
-//   Happy     the notch was tapped: the eye becomes a curve for three seconds
+//   Angry     the battery is nearly gone: a red crescent with a heavy lid
+//   Happy     the notch was tapped: a plump upward crescent for three seconds
 //
 // Startled and Happy are events with a deadline, Angry is a state that lasts
 // as long as the battery does. Events win while they last, so a tap still gets
-// its smile on a phone at four per cent, and the red comes back on its own
+// its smile on a phone at four per cent, and the glare comes back on its own
 // when the three seconds are up. The red tint itself is tied to the battery
 // rather than to the mood, so a smile on a dying phone is still a red smile:
 // the colour is the warning, the shape is the reply to the tap.
+//
+// Angry and Happy are both crescents, and they are deliberately the same
+// construction read in opposite directions: two curves bowing the same way,
+// the far one further than the near one, so the shape is fat in the middle and
+// runs out to nothing at the two ends. Bowed down with sharp ends it is a
+// scowl; bowed up with round ends it is a smile. That is also why the angry
+// mood has no brow any more — a crescent lid is already the scowl, and a
+// separate stroke floating above it was a second eyebrow on a face with one
+// eye.
 //
 // Everything is a spring rather than a frame count, so the shape is always
 // somewhere sensible even when two things happen at once, and the caller only
@@ -43,14 +52,24 @@ class Eye(private val ui: Ui) {
     // How wide the eye is against its resting size; the startle is a jump to
     // a little over 1 and a settle back
     private val size = Spring(1f, 0.004f, 420f, 26f)
-    // Crossfade from the oval to the happy curve
+    // Crossfade from the oval to the happy crescent
     private val joy = Spring(0f, 0.004f, 420f, 32f)
-    // Red tint, and the brow that comes with the angry mood
+    // Crossfade from the oval to the angry crescent. Slower than joy: a glare
+    // settling in should feel like a mood arriving, not a shape snapping.
+    private val glare = Spring(0f, 0.004f, 260f, 30f)
+    // Red tint
     private val red = Spring(0f, 0.004f, 240f, 30f)
-    private val brow = Spring(0f, 0.004f, 300f, 30f)
 
     private val solid = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
+    // The happy crescent is filled and then stroked with a round join, which
+    // rounds its two ends and puffs the whole shape out by half a stroke. That
+    // is the whole difference between a cute curve and a sharp one, and it is
+    // cheaper than building rounded ends into the path.
+    private val plump = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL_AND_STROKE
+        strokeJoin = Paint.Join.ROUND
+        strokeCap = Paint.Cap.ROUND
+    }
     private val oval = RectF()
     private val path = Path()
 
@@ -89,7 +108,7 @@ class Eye(private val ui: Ui) {
     fun happy() {
         event = Mood.Happy
         eventUntil = SystemClock.uptimeMillis() + HAPPY_MS
-        // The curve is a closed eye already; no blink inside it
+        // The crescent is a closed eye already; no blink inside it
         blinkAt = eventUntil + BLINK_MS / 2
     }
 
@@ -109,7 +128,9 @@ class Eye(private val ui: Ui) {
         val now = SystemClock.uptimeMillis()
         val m = mood
 
-        // Blink, unless the eye is a curve or still wide from a fright
+        // Blink, unless the eye is a happy crescent or still wide from a
+        // fright. The glare does blink: a narrowed eye closing and reopening
+        // is a good deal more pointed than one that simply stares.
         if (m == Mood.Calm || m == Mood.Angry) {
             if (openAt == 0L && now >= blinkAt) {
                 lid.target = BLINK_LID
@@ -124,19 +145,19 @@ class Eye(private val ui: Ui) {
                 openAt = 0L
             }
         } else {
-            // No blinking inside a curve or a fright: the lid is held open and
-            // the next one is scheduled for after the mood is over
+            // No blinking inside a crescent or a fright: the lid is held open
+            // and the next one is scheduled for after the mood is over
             openAt = 0L
             lid.target = 1f
         }
 
-        size.target = if (m == Mood.Startled) STARTLE_SIZE else 1f
+        size.target = if (m == Mood.Startled) MAX_GROWTH else 1f
         joy.target = if (m == Mood.Happy) 1f else 0f
+        glare.target = if (m == Mood.Angry) 1f else 0f
         red.target = if (low > 0) 1f else 0f
-        brow.target = if (m == Mood.Angry) 1f else 0f
 
         var moving = false
-        for (s in arrayOf(lid, size, joy, red, brow)) moving = s.step(dt) or moving
+        for (s in arrayOf(lid, size, joy, glare, red)) moving = s.step(dt) or moving
         // The critical level pulses, so it keeps asking for frames
         if (low == CRITICAL) {
             phase = (phase + dt * THROB_RATE) % (Math.PI.toFloat() * 2)
@@ -156,41 +177,60 @@ class Eye(private val ui: Ui) {
         val w = full * WIDTH
         val open = lid.value.coerceIn(0f, 1f)
         val j = joy.value.coerceIn(0f, 1f)
+        val g = glare.value.coerceIn(0f, 1f)
         val tint = colour()
 
-        // Oval and curve are crossfaded rather than morphed: two simple
-        // shapes, each always drawn correctly, beat one shape that is wrong
-        // in the middle
-        if (j < 0.99f) {
-            val eh = max(full * LINE, full * open)
+        // Three shapes crossfaded rather than one shape morphed: each is
+        // always drawn correctly on its own, where a single path bent between
+        // an oval, a scowl and a smile is wrong in the middle of every
+        // transition. Joy is applied last and over everything, so a tap during
+        // a glare reads as the smile winning.
+        val rest = (1f - j) * (1f - g)
+        val scowl = (1f - j) * g
+
+        if (rest > 0.01f) {
+            // A blink is a line, not nothing: the height has a floor in the
+            // eye's own units and a second one in dp, because the smallest
+            // notch with the smallest eye in it is a shape only a few dp tall
+            // and a fourteen per cent slice of that is under a pixel
+            val eh = max(max(full * LINE, ui.dp(BLINK_FLOOR)), full * open)
             oval.set(cx - w / 2, cy - eh / 2, cx + w / 2, cy + eh / 2)
-            solid.color = ui.alpha(tint, a * (1f - j))
+            solid.color = ui.alpha(tint, a * rest)
             c.drawOval(oval, solid)
         }
-        if (j > 0.01f) {
-            // Happy is a closed eye: an arc bowed upwards, drawn as a stroke
-            // so it reads as a line and not as a sliver of the oval
-            val aw = w * HAPPY_W
-            val rise = full * HAPPY_RISE
-            stroke.strokeWidth = max(ui.dp(1.4f), full * LINE)
-            stroke.color = ui.alpha(tint, a * j)
+
+        if (scowl > 0.01f) {
+            // The devil's eye: a crescent with its ends swept up above the eye
+            // line and its body sagging below it, both edges bowing down and
+            // the lower one bowing further. The ends are left sharp — that is
+            // the point of it — and the whole thing is squeezed towards the
+            // eye line by the lid, so a glare can still blink.
+            val squeeze = max(LINE, open)
+            val half = w * DEVIL_W / 2
+            val tip = cy - full * DEVIL_TIP * squeeze
             path.reset()
-            path.moveTo(cx - aw / 2, cy + rise / 2)
-            path.quadTo(cx, cy - rise * 1.5f, cx + aw / 2, cy + rise / 2)
-            c.drawPath(path, stroke)
+            path.moveTo(cx - half, tip)
+            path.quadTo(cx, cy + full * DEVIL_LID * squeeze, cx + half, tip)
+            path.quadTo(cx, cy + full * DEVIL_FLOOR * squeeze, cx - half, tip)
+            path.close()
+            solid.color = ui.alpha(tint, a * scowl)
+            c.drawPath(path, solid)
         }
 
-        // Brow: one slanted stroke over the eye. Angled rather than straight,
-        // because a level line above an eye is a lid and a slanted one is a
-        // frown, and the frown is the whole point of the angry mood.
-        val b = brow.value.coerceIn(0f, 1f)
-        if (b > 0.02f) {
-            val bw = w * BROW_W
-            val top = cy - full * BROW_GAP
-            val tilt = full * BROW_TILT
-            stroke.strokeWidth = max(ui.dp(1.2f), full * BROW_LINE)
-            stroke.color = ui.alpha(tint, a * b)
-            c.drawLine(cx - bw / 2, top - tilt / 2, cx + bw / 2, top + tilt / 2, stroke)
+        if (j > 0.01f) {
+            // Happy is a closed eye: the same crescent turned over, bowing up
+            // with its ends dipped, and drawn plump with round ends so it
+            // reads as a bubble of a smile rather than a sliver of the oval.
+            val half = w * HAPPY_W / 2
+            val tip = cy + full * HAPPY_TIP
+            path.reset()
+            path.moveTo(cx - half, tip)
+            path.quadTo(cx, cy - full * HAPPY_TOP, cx + half, tip)
+            path.quadTo(cx, cy - full * HAPPY_BOT, cx - half, tip)
+            path.close()
+            plump.strokeWidth = max(ui.dp(1f), full * HAPPY_PUFF)
+            plump.color = ui.alpha(tint, a * j)
+            c.drawPath(path, plump)
         }
     }
 
@@ -224,11 +264,27 @@ class Eye(private val ui: Ui) {
     }
 
     companion object {
+        // The most the eye ever grows past its resting height, which is the
+        // startle, and the tallest the drawn shape gets against that grown
+        // height. Both are public because whoever hands draw() a height has to
+        // budget for the largest thing it can become, and a copy of either
+        // number on the other side of that call is a copy that will drift.
+        //
+        // EXTENT is over 1 because the crescents are not inside the oval: the
+        // scowl's floor bows to half of DEVIL_FLOOR below the eye line, which
+        // is further down than the oval's own edge, and that is the lowest
+        // point anything here reaches.
+        const val MAX_GROWTH = 1.32f
+        const val MAX_EXTENT = 1.10f
+
         // Oval width over its height: taller than wide, the way Tepi's own
         // pair are drawn in the app
         private const val WIDTH = 0.62f
-        // Thinnest the eye gets: a blink is a line, not nothing at all
+        // Thinnest the eye gets: a blink is a line, not nothing at all, as a
+        // fraction of the height and as a hard floor in dp for the settings
+        // where that fraction comes out under a pixel
         private const val LINE = 0.14f
+        private const val BLINK_FLOOR = 1.2f
 
         // Every seven seconds, held shut just long enough to be seen
         private const val BLINK_MS = 7000L
@@ -237,18 +293,32 @@ class Eye(private val ui: Ui) {
 
         // A fright is a jump in size and a few seconds to get over it
         private const val STARTLE_MS = 2600L
-        private const val STARTLE_SIZE = 1.32f
 
         // A tap is answered for three seconds
         private const val HAPPY_MS = 3000L
-        private const val HAPPY_W = 1.5f
-        private const val HAPPY_RISE = 0.5f
 
-        // Brow: how wide, how far above the eye, how far it tilts, how thick
-        private const val BROW_W = 1.55f
-        private const val BROW_GAP = 0.62f
-        private const val BROW_TILT = 0.34f
-        private const val BROW_LINE = 0.15f
+        // The angry crescent, in fractions of the eye's height. The ends sweep
+        // up by TIP, the upper edge sags to LID and the lower one to FLOOR;
+        // the gap between those two at the centre is what the eye is made of,
+        // so FLOOR must stay the larger of the pair. A quadratic sits halfway
+        // between its control point and the chord, so the thickness in the
+        // middle works out at (FLOOR - LID) / 2 — a third of the height here —
+        // and the three numbers are chosen so the shape is centred on the eye
+        // line rather than hanging below it.
+        private const val DEVIL_W = 1.42f
+        private const val DEVIL_TIP = 0.36f
+        private const val DEVIL_LID = 0.46f
+        private const val DEVIL_FLOOR = 1.08f
+
+        // The happy crescent, the same construction turned over: the ends dip
+        // by TIP, the outer edge rises to TOP and the inner one to BOT, and
+        // PUFF is the round stroke that thickens it and blunts its ends. Same
+        // third-of-the-height body, same centring.
+        private const val HAPPY_W = 1.55f
+        private const val HAPPY_TIP = 0.29f
+        private const val HAPPY_TOP = 0.87f
+        private const val HAPPY_BOT = 0.25f
+        private const val HAPPY_PUFF = 0.07f
 
         // The two levels Android itself warns at
         private const val LOW = 20

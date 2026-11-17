@@ -133,7 +133,7 @@
     <string name="reads_radios">Reads whether Wi-Fi and Bluetooth are on and what they are connected to, for Home\’s two tiles. Nothing leaves the phone.</string>
     <string name="reads_shot">Reads the newest picture in your gallery to show the screenshot card, and the recent ones for the screenshot tab. Images stay on the phone; Tepi only hands one to the app you pick from Share, or copies it into the shelf when you ask.</string>
     <string name="reads_code">Code: %1$s</string>
-    <string name="reads_notch">Reads the battery level and the rotation, so the eye in the landscape notch can blink, widen and go red. It is told that another app sent you something, never what it was or who sent it, and nothing about it leaves the phone.</string>
+    <string name="reads_notch">Reads the battery level and the rotation, so the eye in the landscape notch can blink, widen and narrow to a red crescent. It is told that another app sent you something, never what it was or who sent it, and nothing about it leaves the phone.</string>
     <string name="reads_never_title">Never</string>
     <string name="reads_never">Tepi never reads passwords, keystrokes, or app screens, and has no analytics.</string>
     <string name="t_focus">Focus</string>
@@ -432,9 +432,11 @@
     <!-- Landscape notch, and the eye in it -->
     <string name="notch">Sideways</string>
     <string name="notch_bar">Notch in landscape</string>
-    <string name="notch_bar_sub">Turned sideways the island has nowhere to sit, so it becomes a small rounded block on the camera edge with one eye in it. The eye blinks, widens when another app sends you something, and goes red when the battery is nearly gone.</string>
+    <string name="notch_bar_sub">Turned sideways the island has nowhere to sit, so it becomes a small rounded block hanging from the middle of the top edge with one eye in it. The eye blinks, widens when another app sends you something, and narrows to a red crescent when the battery is nearly gone.</string>
     <string name="notch_tap">Tap opens the menu</string>
     <string name="notch_tap_on">A tap on the notch opens the island\'s quick menu.</string>
     <string name="notch_tap_off">A tap on the notch only makes the eye smile. Nothing opens, so a game or a video is never interrupted.</string>
-    <string name="notch_note">The notch stays up in games, videos, and fullscreen apps, which is where the island itself is hidden. Hide for an hour from the island\'s menu puts it away as well.</string>
+    <string name="notch_size">Notch size</string>
+    <string name="notch_eye">Eye size</string>
+    <string name="notch_note">The notch stays up in games, videos, and fullscreen apps, which is where the island itself is hidden. Hide for an hour from the island\'s menu puts it away as well. The eye is held inside the block whatever the two sizes say, so a big eye in a small notch is as big as the notch allows and no bigger.</string>
 </resources>

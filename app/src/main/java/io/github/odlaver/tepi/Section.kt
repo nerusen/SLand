@@ -64,6 +64,17 @@ class Section : Page() {
             toggle(n, getString(R.string.notch_tap), getString(if (prefs.notchOpens) R.string.notch_tap_on else R.string.notch_tap_off), prefs.notchOpens, icon = Icon.Hand) {
                 prefs.notchOpens = it; changed(); rebuild()
             }
+            // Two sliders rather than one: how much screen the block takes and
+            // how much of the block is face are different wants, and a single
+            // control would have tied a bigger notch to a bigger eye
+            slider(n, getString(R.string.notch_size), Prefs.NOTCH_SIZE_MIN, Prefs.NOTCH_SIZE_MAX, prefs.notchSize, { "$it%" }, Icon.Stretch) {
+                prefs.notchSize = it
+                changed()
+            }
+            slider(n, getString(R.string.notch_eye), Prefs.NOTCH_EYE_MIN, Prefs.NOTCH_EYE_MAX, prefs.notchEye, { "$it%" }, Icon.Eye) {
+                prefs.notchEye = it
+                changed()
+            }
             note(getString(R.string.notch_note))
         }
                 label(getString(R.string.gestures))

@@ -64,9 +64,10 @@ class Prefs(context: Context) {
         get() = bool("nav.always", false)
         set(v) = set("nav.always", v)
 
-    // Landscape notch: the rounded block with one eye in it, on the camera
-    // edge, for when the island itself has nowhere to be. On by default,
-    // because the alternative is a phone that looks like Tepi is off.
+    // Landscape notch: the rounded block with one eye in it, hanging from the
+    // middle of the top edge, for when the island itself has nowhere to be. On
+    // by default, because the alternative is a phone that looks like Tepi is
+    // off.
     var notchBar: Boolean
         get() = bool("notch.bar", true)
         set(v) = set("notch.bar", v)
@@ -78,6 +79,21 @@ class Prefs(context: Context) {
         get() = bool("notch.opens", false)
         set(v) = set("notch.opens", v)
 
+    // Size of the notch itself, as a percentage of the drawn default. Both the
+    // depth and the length scale together, so the silhouette keeps its
+    // proportions at every setting.
+    var notchSize: Int
+        get() = int("notch.size", NOTCH_SIZE_DEFAULT)
+        set(v) = set("notch.size", v)
+
+    // Size of the eye inside it, as a percentage of its default height against
+    // the block's depth. Separate from the notch's own size on purpose: the
+    // two wants are different, one is how much of the screen is given up and
+    // the other is how much of that block is face.
+    var notchEye: Int
+        get() = int("notch.eye", NOTCH_EYE_DEFAULT)
+        set(v) = set("notch.eye", v)
+
     companion object {
         const val OFFSET_MIN = -8
         const val OFFSET_MAX = 24
@@ -86,5 +102,34 @@ class Prefs(context: Context) {
         const val IDLE_WIDTH_DEFAULT = 150
         const val IDLE_WIDTH_MIN = 90
         const val IDLE_WIDTH_MAX = 260
+
+        // Notch size, per cent of the default 26 x 100 dp block.
+        //
+        // The floor is where the shape is still legibly a notch with an eye in
+        // it rather than a dark smudge: at 70 the block is 18 dp deep, and the
+        // eye inside it at its own smallest setting is about 6 dp tall, which
+        // is a blink that can still be seen. The ceiling is where it stops
+        // being a notch and starts being a bar someone has to look past: at
+        // 150 it is 39 dp deep and 150 dp long, already deeper than a status
+        // bar. Anything past that is covering the game it is supposed to sit
+        // quietly on top of, and the screen-fraction caps in Notch would start
+        // clipping it on smaller phones anyway.
+        const val NOTCH_SIZE_DEFAULT = 100
+        const val NOTCH_SIZE_MIN = 70
+        const val NOTCH_SIZE_MAX = 150
+
+        // Eye size, per cent of its default height within the block.
+        //
+        // The floor is a dot that still blinks: at 60 in the smallest notch
+        // the eye is about 5 dp tall, and its blink has a dp floor of its own
+        // so it cannot thin out to nothing. The ceiling is set by the room the
+        // shape needs rather than by taste — a startled eye grows a third
+        // again, and the crescents reach further than the oval — so Notch
+        // holds the drawn height to a fraction of the depth whatever is asked
+        // for. At 120 the eye is exactly against that ceiling, so the slider
+        // stops there instead of pretending to do more.
+        const val NOTCH_EYE_DEFAULT = 100
+        const val NOTCH_EYE_MIN = 60
+        const val NOTCH_EYE_MAX = 120
     }
 }

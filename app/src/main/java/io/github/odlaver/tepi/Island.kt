@@ -108,7 +108,7 @@ class Island(
     }
     private var attached = false
     private var input: Input? = null
-    // Landscape: a notch on the camera edge instead of nothing at all
+    // Landscape: a notch on the top edge instead of nothing at all
     private var notch: Notch? = null
     private var notchUp = false
 
