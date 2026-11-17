@@ -95,6 +95,16 @@ class Island(
         layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= 30) WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
         else WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         if (Build.VERSION.SDK_INT >= 30) fitInsetsTypes = 0
+        // The window is resized and moved under the shape: grown for a
+        // transition, shrunk back once it settles. WindowManager animates
+        // every change of a window's position by default, sliding the surface
+        // from the old spot to the new one while the content inside has
+        // already been drawn for the new spot. Closing a panel back to the
+        // resting capsule shrinks the window from the left, so the capsule
+        // was shown displaced to the left for that slide and then crept back
+        // to the lens. The island does all of its own motion; the window has
+        // to land where it is put, instantly.
+        noMoveAnimation(this)
     }
     private var attached = false
     private var input: Input? = null
@@ -941,5 +951,26 @@ class Island(
         private const val NAV_H = 36f
         private const val NAV_MS = 4500L
         const val URGENT = 95
+
+        // Hidden flag value, used only when the field itself cannot be read
+        private const val NO_MOVE_ANIMATION_FALLBACK = 0x00000040
+
+        // Public from Android 14. Before that the same switch is a private
+        // flag; it is set reflectively, and if that is ever refused the
+        // window simply keeps the system's move animation as it did before.
+        @SuppressLint("SoonBlockedPrivateApi", "DiscouragedPrivateApi")
+        private fun noMoveAnimation(p: WindowManager.LayoutParams) {
+            if (Build.VERSION.SDK_INT >= 34) {
+                p.setCanPlayMoveAnimation(false)
+                return
+            }
+            try {
+                val cls = WindowManager.LayoutParams::class.java
+                val flag = try { cls.getField("PRIVATE_FLAG_NO_MOVE_ANIMATION").getInt(null) }
+                    catch (_: Throwable) { NO_MOVE_ANIMATION_FALLBACK }
+                val field = cls.getField("privateFlags")
+                field.setInt(p, field.getInt(p) or flag)
+            } catch (_: Throwable) { }
+        }
     }
 }
