@@ -76,8 +76,8 @@
     <string name="act_progress_sub">Notifikasi apa pun yang punya bar progres.</string>
     <string name="act_nav">Navigasi</string>
     <string name="act_nav_sub">Belokan berikutnya dari Google Maps.</string>
-    <string name="act_ringer">Mode dering</string>
-    <string name="act_ringer_sub">Senyap, getar, atau dering setelah diganti.</string>
+    <string name="act_ringer">Mode hening</string>
+    <string name="act_ringer_sub">Satu baris saat HP menjadi hening, getar, atau kembali berdering.</string>
     <string name="act_audio">Perangkat audio</string>
     <string name="act_audio_sub">Headset atau speaker tersambung.</string>
     <string name="act_privacy">Kamera dan mic dipakai</string>
@@ -127,6 +127,8 @@
     <string name="reads_overlay">Menggambar island di atas aplikasi lain.</string>
     <string name="reads_lyrics">Mengirim judul dan artis lagu ke LRCLIB, lalu NetEase. Lirik disimpan di HP.</string>
     <string name="reads_shelf">Menyimpan salinan yang kamu bagikan ke Tepi, di penyimpanan aplikasi. Terhapus bersama aplikasi.</string>
+    <string name="reads_radios">Membaca status Wi-Fi dan Bluetooth beserta nama koneksinya, untuk dua kolom di Beranda. Tidak ada yang keluar dari HP.</string>
+    <string name="reads_shot">Membaca gambar terbaru di galeri untuk menampilkan kartu screenshot. Gambarnya tetap di HP; Tepi hanya menyerahkannya ke aplikasi yang kamu pilih dari Bagikan.</string>
     <string name="reads_code">Kode: %1$s</string>
     <string name="reads_never_title">Tidak pernah</string>
     <string name="reads_never">Tepi tidak pernah membaca kata sandi, ketikan, atau layar aplikasi, dan tidak punya analitik.</string>
@@ -170,9 +172,6 @@
     <string name="save_to_tepi">Simpan ke Tepi</string>
     <string name="shortcut_focus">Fokus 25</string>
     <string name="shortcut_note">Catatan baru</string>
-    <string name="b_silent">Senyap</string>
-    <string name="b_vibrate">Getar</string>
-    <string name="b_ring">Dering</string>
     <string name="b_audio">Tersambung</string>
     <string name="cd_cam">Kamera sedang dipakai</string>
     <string name="cd_mic">Mikrofon sedang dipakai</string>
@@ -371,4 +370,49 @@
         <item quantity="one">%1$d kontribusi pada %2$s</item>
         <item quantity="other">%1$d kontribusi pada %2$s</item>
     </plurals>
+
+    <!-- Kartu screenshot -->
+    <string name="act_shot">Screenshot</string>
+    <string name="act_shot_sub">Thumbnail, nama file, serta tombol Buka dan Bagikan setelah screenshot.</string>
+    <string name="act_shot_need">Perlu izin membaca galeri.</string>
+    <string name="act_shot_perm">Akses galeri</string>
+    <string name="act_shot_perm_sub">Android tidak memberi aplikasi tanda bahwa screenshot diambil, jadi Tepi memantau galeri Anda. Gambar dibaca di HP dan tidak pernah dikirim ke mana pun.</string>
+    <string name="shot_taken">Screenshot</string>
+    <string name="size_kb">%1$.0f KB</string>
+    <string name="size_mb">%1$.1f MB</string>
+
+    <!-- Volume -->
+    <string name="act_volume">Volume</string>
+    <string name="act_volume_sub">Garis indikator dan persentase saat Anda menekan tombol volume.</string>
+    <string name="vol_media">Volume media</string>
+    <string name="vol_ring">Volume dering</string>
+    <string name="vol_call">Volume panggilan</string>
+    <string name="vol_alarm">Volume alarm</string>
+
+    <!-- Sakelar dari bilah aksi, masing-masing satu baris -->
+    <string name="act_modes">Mode</string>
+    <string name="act_dnd">Jangan ganggu</string>
+    <string name="act_dnd_sub">Satu baris saat Anda menyalakan atau mematikannya.</string>
+    <string name="act_torch">Senter</string>
+    <string name="act_torch_sub">Satu baris saat senter menyala atau mati.</string>
+    <string name="act_hotspot">Hotspot</string>
+    <string name="act_hotspot_sub">Satu baris saat tethering mulai atau berhenti.</string>
+    <string name="act_plane">Mode pesawat</string>
+    <string name="act_plane_sub">Satu baris saat Anda menyalakan atau mematikannya.</string>
+    <string name="act_saver">Hemat daya</string>
+    <string name="act_saver_sub">Satu baris saat mode ini menyala atau mati.</string>
+    <string name="act_hotspot_note">Android tidak memberi aplikasi cara resmi membaca hotspot, jadi baris itu mungkin tidak muncul di semua HP. Baris lainnya memakai sinyal yang didukung.</string>
+    <string name="f_dnd_on">Mode jangan ganggu aktif</string>
+    <string name="f_dnd_off">Mode jangan ganggu nonaktif</string>
+    <string name="f_silent_on">Mode hening aktif</string>
+    <string name="f_vibrate_on">Hanya getar</string>
+    <string name="f_ring_on">Mode dering aktif</string>
+    <string name="f_torch_on">Senter menyala</string>
+    <string name="f_torch_off">Senter mati</string>
+    <string name="f_hotspot_on">Hotspot aktif</string>
+    <string name="f_hotspot_off">Hotspot nonaktif</string>
+    <string name="f_plane_on">Mode pesawat aktif</string>
+    <string name="f_plane_off">Mode pesawat nonaktif</string>
+    <string name="f_saver_on">Hemat daya aktif</string>
+    <string name="f_saver_off">Hemat daya nonaktif</string>
 </resources>

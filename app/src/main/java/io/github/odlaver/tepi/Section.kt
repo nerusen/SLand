@@ -1,7 +1,6 @@
 package io.github.odlaver.tepi
 
 import android.app.AlertDialog
-import android.os.Build
 import android.content.Intent
 import android.net.Uri
 import android.widget.LinearLayout
@@ -85,10 +84,39 @@ class Section : Page() {
             Quad("act.call", R.string.act_call, R.string.act_call_sub, Icon.Phone),
             Quad("act.progress", R.string.act_progress, R.string.act_progress_sub, Icon.Download),
             Quad("act.nav", R.string.act_nav, R.string.act_nav_sub, Icon.Nav),
-            Quad("act.ringer", R.string.act_ringer, R.string.act_ringer_sub, Icon.Bell),
+            Quad(Volume.KEY, R.string.act_volume, R.string.act_volume_sub, Icon.Volume),
             Quad("act.audio", R.string.act_audio, R.string.act_audio_sub, Icon.Headphones),
             Quad("act.privacy", R.string.act_privacy, R.string.act_privacy_sub, Icon.Shield),
         )) toggle(s, getString(title), getString(detail), prefs.bool(key, true), icon = icon) { prefs.set(key, it); changed() }
+
+        // The screenshot card, and the gallery read it needs
+        label(getString(R.string.act_shot))
+        val sh = group()
+        val shotOk = Capture.allowed(this)
+        toggle(sh, getString(R.string.act_shot), getString(if (shotOk) R.string.act_shot_sub else R.string.act_shot_need),
+            prefs.bool(Capture.KEY, true) && shotOk, shotOk, Icon.Image) { prefs.set(Capture.KEY, it); restartCapture() }
+        if (!shotOk) row(sh, getString(R.string.act_shot_perm), getString(R.string.act_shot_perm_sub),
+            button(getString(R.string.grant)) { requestPermissions(arrayOf(Capture.permission()), REQ_SHOT) }, Icon.Image)
+
+        // Switches from the shade, each said as one line
+        label(getString(R.string.act_modes))
+        val m2 = group()
+        for ((key, title, detail, icon) in listOf(
+            Quad("act.dnd", R.string.act_dnd, R.string.act_dnd_sub, Icon.Moon),
+            Quad("act.ringer", R.string.act_ringer, R.string.act_ringer_sub, Icon.Bell),
+            Quad("act.torch", R.string.act_torch, R.string.act_torch_sub, Icon.Flash),
+            Quad("act.hotspot", R.string.act_hotspot, R.string.act_hotspot_sub, Icon.Hotspot),
+            Quad("act.plane", R.string.act_plane, R.string.act_plane_sub, Icon.Plane),
+            Quad("act.saver", R.string.act_saver, R.string.act_saver_sub, Icon.Leaf),
+        )) toggle(m2, getString(title), getString(detail), prefs.bool(key, true), icon = icon) { prefs.set(key, it); changed() }
+        note(getString(R.string.act_hotspot_note))
+    }
+
+    // The watcher holds a permission state and a switch; both are settled at
+    // start, so it is restarted rather than poked
+    private fun restartCapture() {
+        changed()
+        Listener.instance?.let { it.capture.stop(); it.capture.start() }
     }
 
     private fun productivity() {
@@ -309,14 +337,23 @@ class Section : Page() {
 
     override fun onRequestPermissionsResult(code: Int, perms: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(code, perms, results)
-        if (code != REQ_RADIOS) return
-        // Fresh names for the tiles, and the row's own state
-        Listener.instance?.let { it.radios.stop(); it.radios.start() }
-        rebuild()
+        when (code) {
+            REQ_RADIOS -> {
+                // Fresh names for the tiles, and the row's own state
+                Listener.instance?.let { it.radios.stop(); it.radios.start() }
+                rebuild()
+            }
+            REQ_SHOT -> {
+                // The watcher only registers when the read is allowed
+                Listener.instance?.let { it.capture.stop(); it.capture.start() }
+                rebuild()
+            }
+        }
     }
 
     companion object {
         private const val REQ_RADIOS = 7
+        private const val REQ_SHOT = 8
         const val MODE = "mode"
         const val LINK = "link"
         const val ISLAND = "island"

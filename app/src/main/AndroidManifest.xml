@@ -16,6 +16,17 @@
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
+    <!--
+      The screenshot card. Android has no "a screenshot was taken" signal for
+      other apps, so the gallery is watched for a new image in a Screenshots
+      folder; that read is what these allow. Optional: without them the card
+      stays off and nothing else changes.
+    -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+
     <!-- App list for the notification filter -->
     <queries>
         <intent>

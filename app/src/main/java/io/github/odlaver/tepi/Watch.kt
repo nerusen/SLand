@@ -13,16 +13,20 @@ import android.os.BatteryManager
 import android.os.Handler
 import android.os.Looper
 
-enum class Brief { Charging, Unplugged, Silent, Vibrate, Ring, Audio }
+enum class Brief { Charging, Unplugged, Audio }
 
-// System broadcasts: power, ring mode, audio devices, camera and mic
+// System broadcasts: power, audio devices, camera and mic.
+//
+// The ring mode used to be reported from here as a pill beside the camera. It
+// is a system switch like do not disturb and the torch, so it moved to Flags
+// and is said as a line instead; keeping both would have meant two notices
+// for one press.
 class Watch(private val context: Context, private val prefs: Prefs, private val brief: (Brief, String) -> Unit, private val lowBattery: (Int) -> Unit, private val battery: (Int, Boolean) -> Unit, private val privacy: (Boolean, Boolean) -> Unit) {
     private val main = Handler(Looper.getMainLooper())
     private val audio = context.getSystemService(AudioManager::class.java)
     private val camera = context.getSystemService(CameraManager::class.java)
     private var started = false
     private var lowShown = 100
-    private var lastRinger = -1
     private val camsBusy = HashSet<String>()
     private var mic = false
     private var ready = false
@@ -50,18 +54,6 @@ class Watch(private val context: Context, private val prefs: Prefs, private val 
                 }
                 Intent.ACTION_POWER_CONNECTED -> if (prefs.bool("act.charge", true)) main.postDelayed({ charging = true; brief(Brief.Charging, "$level%") }, 400)
                 Intent.ACTION_POWER_DISCONNECTED -> if (prefs.bool("act.charge", true)) { charging = false; brief(Brief.Unplugged, "$level%") }
-                AudioManager.RINGER_MODE_CHANGED_ACTION -> {
-                    val m = audio.ringerMode
-                    if (m == lastRinger) return
-                    val first = lastRinger < 0
-                    lastRinger = m
-                    if (first || !prefs.bool("act.ringer", true)) return
-                    when (m) {
-                        AudioManager.RINGER_MODE_SILENT -> brief(Brief.Silent, "")
-                        AudioManager.RINGER_MODE_VIBRATE -> brief(Brief.Vibrate, "")
-                        else -> brief(Brief.Ring, "")
-                    }
-                }
             }
         }
     }
@@ -99,10 +91,8 @@ class Watch(private val context: Context, private val prefs: Prefs, private val 
             addAction(Intent.ACTION_BATTERY_CHANGED)
             addAction(Intent.ACTION_POWER_CONNECTED)
             addAction(Intent.ACTION_POWER_DISCONNECTED)
-            addAction(AudioManager.RINGER_MODE_CHANGED_ACTION)
         }
         context.registerReceiver(power, f, Context.RECEIVER_NOT_EXPORTED)
-        lastRinger = audio.ringerMode
         audio.registerAudioDeviceCallback(devices, main)
         audio.registerAudioRecordingCallback(recs, main)
         camera.registerAvailabilityCallback(cams, main)

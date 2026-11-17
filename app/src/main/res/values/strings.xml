@@ -78,8 +78,8 @@
     <string name="act_progress_sub">Any notification with a progress bar.</string>
     <string name="act_nav">Navigation</string>
     <string name="act_nav_sub">Next turn from Google Maps.</string>
-    <string name="act_ringer">Ring mode</string>
-    <string name="act_ringer_sub">Silent, vibrate, or ring after a change.</string>
+    <string name="act_ringer">Silent mode</string>
+    <string name="act_ringer_sub">A line when the phone goes silent, to vibrate, or back to ringing.</string>
     <string name="act_audio">Audio devices</string>
     <string name="act_audio_sub">Headphones or speaker connected.</string>
     <string name="act_privacy">Camera and mic in use</string>
@@ -130,6 +130,8 @@
     <string name="reads_overlay">Draws the island over other apps.</string>
     <string name="reads_lyrics">Sends the song title and artist to LRCLIB, then NetEase. Lyrics are cached on the phone.</string>
     <string name="reads_shelf">Keeps a copy of what you share to Tepi, in app storage. Deleted with the app.</string>
+    <string name="reads_radios">Reads whether Wi-Fi and Bluetooth are on and what they are connected to, for Home\’s two tiles. Nothing leaves the phone.</string>
+    <string name="reads_shot">Reads the newest picture in your gallery to show the screenshot card. The image stays on the phone; Tepi only hands it to the app you pick from Share.</string>
     <string name="reads_code">Code: %1$s</string>
     <string name="reads_never_title">Never</string>
     <string name="reads_never">Tepi never reads passwords, keystrokes, or app screens, and has no analytics.</string>
@@ -173,9 +175,6 @@
     <string name="save_to_tepi">Save to Tepi</string>
     <string name="shortcut_focus">Focus 25</string>
     <string name="shortcut_note">New note</string>
-    <string name="b_silent">Silent</string>
-    <string name="b_vibrate">Vibrate</string>
-    <string name="b_ring">Ring</string>
     <string name="b_audio">Connected</string>
     <string name="cd_cam">Camera in use</string>
     <string name="cd_mic">Microphone in use</string>
@@ -374,4 +373,49 @@
         <item quantity="one">%1$d contribution on %2$s</item>
         <item quantity="other">%1$d contributions on %2$s</item>
     </plurals>
+
+    <!-- Screenshot card -->
+    <string name="act_shot">Screenshots</string>
+    <string name="act_shot_sub">A thumbnail, the file name, and Open and Share after a capture.</string>
+    <string name="act_shot_need">Needs access to your gallery.</string>
+    <string name="act_shot_perm">Gallery access</string>
+    <string name="act_shot_perm_sub">Android has no screenshot signal for apps, so Tepi watches your gallery for a new capture. Pictures are read on the phone and never sent anywhere.</string>
+    <string name="shot_taken">Screenshot</string>
+    <string name="size_kb">%1$.0f KB</string>
+    <string name="size_mb">%1$.1f MB</string>
+
+    <!-- Volume -->
+    <string name="act_volume">Volume</string>
+    <string name="act_volume_sub">A bar and the percentage while you press the volume buttons.</string>
+    <string name="vol_media">Media volume</string>
+    <string name="vol_ring">Ring volume</string>
+    <string name="vol_call">Call volume</string>
+    <string name="vol_alarm">Alarm volume</string>
+
+    <!-- Switches from the shade, one line each -->
+    <string name="act_modes">Modes</string>
+    <string name="act_dnd">Do not disturb</string>
+    <string name="act_dnd_sub">A line when you turn it on or off.</string>
+    <string name="act_torch">Flashlight</string>
+    <string name="act_torch_sub">A line when the torch goes on or off.</string>
+    <string name="act_hotspot">Hotspot</string>
+    <string name="act_hotspot_sub">A line when tethering starts or stops.</string>
+    <string name="act_plane">Airplane mode</string>
+    <string name="act_plane_sub">A line when you turn it on or off.</string>
+    <string name="act_saver">Battery saver</string>
+    <string name="act_saver_sub">A line when it goes on or off.</string>
+    <string name="act_hotspot_note">Android gives apps no official way to read the hotspot, so that line may not appear on every phone. The others use supported signals.</string>
+    <string name="f_dnd_on">Do not disturb is on</string>
+    <string name="f_dnd_off">Do not disturb is off</string>
+    <string name="f_silent_on">Silent mode is on</string>
+    <string name="f_vibrate_on">Vibrate only</string>
+    <string name="f_ring_on">Ringer is on</string>
+    <string name="f_torch_on">Flashlight on</string>
+    <string name="f_torch_off">Flashlight off</string>
+    <string name="f_hotspot_on">Hotspot on</string>
+    <string name="f_hotspot_off">Hotspot off</string>
+    <string name="f_plane_on">Airplane mode on</string>
+    <string name="f_plane_off">Airplane mode off</string>
+    <string name="f_saver_on">Battery saver on</string>
+    <string name="f_saver_off">Battery saver off</string>
 </resources>

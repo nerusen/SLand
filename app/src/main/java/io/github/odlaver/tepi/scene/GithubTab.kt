@@ -10,7 +10,6 @@ import io.github.odlaver.tepi.R
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
-import kotlin.math.max
 import kotlin.math.min
 
 // The GitHub contribution calendar, laid out the way the profile page lays it

@@ -733,6 +733,9 @@ class Island(
         "alert" -> Icon.Bell
         "menu" -> Icon.Layers
         "github" -> Icon.Github
+        "shot" -> Icon.Image
+        "volume" -> Icon.Volume
+        "flag" -> Icon.Spark
         else -> Icon.Layers
     }
 
@@ -965,7 +968,13 @@ class Island(
         // Tab bar: how tall, and how long it stays up after the last nudge
         private const val NAV_H = 36f
         private const val NAV_MS = 4500L
-        const val URGENT = 95
+        // What still shows through a fullscreen app or a game. The system
+        // notices sit just on this side of the line on purpose: a volume
+        // press, a screenshot and a mode switch are all answers to something
+        // the user just did, and a game or a video player is exactly where
+        // they do it. Calls stay above them, so a ringing phone is never
+        // covered by a volume bar.
+        const val URGENT = 93
 
         // Hidden flag value, used only when the field itself cannot be read
         private const val NO_MOVE_ANIMATION_FALLBACK = 0x00000040

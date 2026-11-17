@@ -2,7 +2,6 @@ package io.github.odlaver.tepi.scene
 
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Path
 import android.graphics.RectF
 import android.os.Handler
 import android.os.Looper
@@ -12,8 +11,6 @@ import io.github.odlaver.tepi.LiveItem
 import io.github.odlaver.tepi.LiveKind
 import io.github.odlaver.tepi.R
 import kotlin.math.min
-
-private val glyphPath = Path()
 
 // Small line glyphs shared by system scenes
 private fun drawPhone(c: Canvas, ui: io.github.odlaver.tepi.Ui, cx: Float, cy: Float, s: Float) {
@@ -35,38 +32,7 @@ private fun drawPhones(c: Canvas, ui: io.github.odlaver.tepi.Ui, cx: Float, cy: 
     box.set(cx + s * 0.25f, cy, cx + s * 0.5f, cy + s * 0.5f); c.drawRoundRect(box, s * 0.08f, s * 0.08f, ui.solid)
 }
 
-private fun drawBell(c: Canvas, ui: io.github.odlaver.tepi.Ui, cx: Float, cy: Float, s: Float, slash: Boolean) {
-    glyphPath.reset()
-    glyphPath.moveTo(cx - s * 0.38f, cy + s * 0.25f)
-    glyphPath.lineTo(cx - s * 0.32f, cy - s * 0.1f)
-    glyphPath.quadTo(cx - s * 0.3f, cy - s * 0.45f, cx, cy - s * 0.45f)
-    glyphPath.quadTo(cx + s * 0.3f, cy - s * 0.45f, cx + s * 0.32f, cy - s * 0.1f)
-    glyphPath.lineTo(cx + s * 0.38f, cy + s * 0.25f)
-    glyphPath.close()
-    c.drawPath(glyphPath, ui.solid)
-    c.drawCircle(cx, cy + s * 0.38f, s * 0.1f, ui.solid)
-    if (slash) {
-        ui.stroke.strokeWidth = s * 0.12f
-        ui.stroke.color = Color.BLACK
-        c.drawLine(cx - s * 0.5f, cy - s * 0.5f, cx + s * 0.5f, cy + s * 0.5f, ui.stroke)
-        ui.stroke.strokeWidth = s * 0.07f
-        ui.stroke.color = ui.solid.color
-        c.drawLine(cx - s * 0.5f, cy - s * 0.5f, cx + s * 0.5f, cy + s * 0.5f, ui.stroke)
-    }
-}
-
-private fun drawVibrate(c: Canvas, ui: io.github.odlaver.tepi.Ui, cx: Float, cy: Float, s: Float) {
-    val box = RectF(cx - s * 0.2f, cy - s * 0.42f, cx + s * 0.2f, cy + s * 0.42f)
-    c.drawRoundRect(box, s * 0.08f, s * 0.08f, ui.solid)
-    ui.stroke.strokeWidth = s * 0.08f
-    ui.stroke.color = ui.solid.color
-    for (side in intArrayOf(-1, 1)) {
-        c.drawLine(cx + side * s * 0.33f, cy - s * 0.22f, cx + side * s * 0.33f, cy + s * 0.22f, ui.stroke)
-        c.drawLine(cx + side * s * 0.46f, cy - s * 0.12f, cx + side * s * 0.46f, cy + s * 0.12f, ui.stroke)
-    }
-}
-
-// Short pill: charging, ring mode, audio device
+// Short pill: charging, audio device
 class BriefScene(host: Host) : Scene(host) {
     override val id = "brief"
     override val priority = 80
@@ -78,9 +44,6 @@ class BriefScene(host: Host) : Scene(host) {
     fun show(k: Brief, t: String) {
         kind = k
         text = when (k) {
-            Brief.Silent -> host.ctx.getString(R.string.b_silent)
-            Brief.Vibrate -> host.ctx.getString(R.string.b_vibrate)
-            Brief.Ring -> host.ctx.getString(R.string.b_ring)
             Brief.Audio -> t.ifEmpty { host.ctx.getString(R.string.b_audio) }
             else -> t
         }
@@ -102,9 +65,6 @@ class BriefScene(host: Host) : Scene(host) {
         ui.solid.color = ui.alpha(if (k == Brief.Charging) CHARGE else ui.ink, a)
         when (k) {
             Brief.Charging, Brief.Unplugged -> ui.bolt(c, cx, cy, s)
-            Brief.Silent -> drawBell(c, ui, cx, cy, s, slash = true)
-            Brief.Vibrate -> drawVibrate(c, ui, cx, cy, s)
-            Brief.Ring -> drawBell(c, ui, cx, cy, s, slash = false)
             Brief.Audio -> drawPhones(c, ui, cx, cy, s)
         }
         val p = ui.compact

@@ -12,7 +12,7 @@ enum class Icon {
     Play, Pause, Next, Prev, Stop, Plus, Check, Close, Timer, Note, Gear, Home, Hide, Copy, Share, Open, Reply,
     Flag, Music, Lyrics, Bell, Moon, Drop, Eye, Stretch, Bolt, Phone, Headphones, Download, Nav, Camera, Shield,
     Book, Tasks, Shelf, Info, Code, User, Battery, Layers, Hand, Power, Chat, Link, Pin, Trash, Laptop, Globe, Coffee, Chevron, Spark,
-    Wifi, Bluetooth, Github
+    Wifi, Bluetooth, Github, Volume, Mute, Image, Flash, Hotspot, Plane, Leaf, BellOff
 }
 
 // Line icons on a 24-unit grid, drawn with the Ink stroke
@@ -132,6 +132,68 @@ object Icons {
                 path.cubicTo(14.939f, 23.411f, 15.149f, 23.786f, 15.764f, 23.666f); path.cubicTo(20.565f, 22.092f, 24f, 17.592f, 24f, 12.297f)
                 path.cubicTo(24f, 5.67f, 18.627f, 0.297f, 12f, 0.297f); path.close()
                 c.drawPath(path, p)
+            }
+            // Cone plus two waves; the mute twin swaps the waves for a cross
+            Icon.Volume -> {
+                fill(); poly(c, 3f, 9.5f, 7f, 9.5f, 11.5f, 5f, 11.5f, 19f, 7f, 14.5f, 3f, 14.5f, close = true)
+                line()
+                // Arc boxes are kept clear of the grid edge: the stroke is two
+                // units wide and straddles the path, so a wave drawn out to 23
+                // would have its outer half clipped
+                r.set(8f, 8f, 17f, 16f); c.drawArc(r, -55f, 110f, false, p)
+                r.set(6f, 5f, 21f, 19f); c.drawArc(r, -50f, 100f, false, p)
+            }
+            Icon.Mute -> {
+                fill(); poly(c, 3f, 9.5f, 7f, 9.5f, 11.5f, 5f, 11.5f, 19f, 7f, 14.5f, 3f, 14.5f, close = true)
+                line()
+                ln(c, 14.5f, 9.5f, 20.5f, 14.5f); ln(c, 20.5f, 9.5f, 14.5f, 14.5f)
+            }
+            // Picture frame: sun in one corner, hills across the bottom
+            Icon.Image -> {
+                rr(c, 3f, 5f, 21f, 19f, 2.5f)
+                c.drawCircle(8.5f, 9.5f, 1.6f, p)
+                poly(c, 4.5f, 17.5f, 9.5f, 12.5f, 13f, 15.5f, 16f, 12f, 20f, 17.5f)
+            }
+            // Torch, head up, with the beam as three short rays
+            Icon.Flash -> {
+                rr(c, 8.5f, 6.5f, 15.5f, 10f, 1f)
+                poly(c, 9.5f, 10f, 14.5f, 10f, 13.8f, 20.5f, 10.2f, 20.5f, close = true)
+                ln(c, 12f, 2.5f, 12f, 4.5f); ln(c, 6.5f, 4f, 7.8f, 5.3f); ln(c, 17.5f, 4f, 16.2f, 5.3f)
+            }
+            // Access point: waves fanning off a dot, on a stand
+            Icon.Hotspot -> {
+                for (rad in floatArrayOf(5f, 8.5f)) { r.set(12f - rad, 11.5f - rad, 12f + rad, 11.5f + rad); c.drawArc(r, 215f, 110f, false, p) }
+                ln(c, 12f, 13.5f, 12f, 19f); ln(c, 8.5f, 20.5f, 15.5f, 20.5f)
+                fill(); c.drawCircle(12f, 11.5f, 1.8f, p)
+            }
+            // Airliner from above
+            Icon.Plane -> {
+                fill()
+                poly(
+                    c, 12f, 2.5f, 13.2f, 4f, 13.2f, 9.5f, 21f, 14.5f, 21f, 16.5f, 13.2f, 14f, 13.2f, 18.5f,
+                    15.5f, 20.5f, 15.5f, 21.8f, 12f, 20.8f, 8.5f, 21.8f, 8.5f, 20.5f, 10.8f, 18.5f, 10.8f, 14f,
+                    3f, 16.5f, 3f, 14.5f, 10.8f, 9.5f, 10.8f, 4f, close = true,
+                )
+            }
+            // Leaf, the mark Android itself uses for battery saver
+            Icon.Leaf -> {
+                path.reset()
+                path.moveTo(4.5f, 19.5f)
+                path.cubicTo(3.5f, 10f, 10f, 3.5f, 19.5f, 4f)
+                path.cubicTo(20f, 13.5f, 14f, 20.5f, 4.5f, 19.5f)
+                path.close()
+                c.drawPath(path, p)
+                ln(c, 5.5f, 18.5f, 16f, 8f)
+            }
+            // Bell, struck through: silent and do not disturb
+            Icon.BellOff -> {
+                path.reset()
+                path.moveTo(5f, 17f); path.lineTo(6.5f, 15f); path.lineTo(6.5f, 10.5f)
+                path.quadTo(6.5f, 4.5f, 12f, 4.5f); path.quadTo(17.5f, 4.5f, 17.5f, 10.5f)
+                path.lineTo(17.5f, 15f); path.lineTo(19f, 17f); path.close()
+                c.drawPath(path, p)
+                ln(c, 10f, 20.5f, 14f, 20.5f)
+                ln(c, 4f, 3.5f, 20f, 20.5f)
             }
         }
         line()

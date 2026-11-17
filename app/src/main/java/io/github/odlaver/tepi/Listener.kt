@@ -26,7 +26,6 @@ import io.github.odlaver.tepi.scene.BriefScene
 import io.github.odlaver.tepi.scene.CallScene
 import io.github.odlaver.tepi.scene.ClassRow
 import io.github.odlaver.tepi.scene.TaskRow
-import io.github.odlaver.tepi.scene.TasksScene
 import io.github.odlaver.tepi.scene.ClockScene
 import io.github.odlaver.tepi.scene.IncomingScene
 import io.github.odlaver.tepi.scene.NavScene
@@ -61,9 +60,15 @@ class Listener : NotificationListenerService() {
     private lateinit var watch: Watch
     lateinit var radios: Radios
     lateinit var github: Github
+    lateinit var capture: Capture
+    lateinit var volume: Volume
+    lateinit var flags: Flags
     private var briefs: BriefScene? = null
     private var privacyScene: PrivacyScene? = null
     private var timerScene: TimerScene? = null
+    private var shots: io.github.odlaver.tepi.scene.ShotScene? = null
+    private var volumeScene: io.github.odlaver.tepi.scene.VolumeScene? = null
+    private var flagScene: io.github.odlaver.tepi.scene.FlagScene? = null
     private var translateScene: io.github.odlaver.tepi.scene.TranslateScene? = null
 
     override fun onCreate() {
@@ -81,6 +86,20 @@ class Listener : NotificationListenerService() {
         pc.onFile = { name, uri -> fromLaptop(name, uri) }
         radios = Radios(this) { island?.refresh() }
         github = Github(this, agenda.vault) { island?.refresh() }
+        // A screenshot, the volume buttons, and the switches in the shade:
+        // each one only ever speaks when the user has just acted on the phone
+        capture = Capture(this, prefs) { shot ->
+            ensureIsland()
+            shots?.show(shot)
+        }
+        volume = Volume(this, prefs) { now, max, muted ->
+            ensureIsland()
+            volumeScene?.show(now, max, muted, volume.kind)
+        }
+        flags = Flags(this, prefs) { flag, on ->
+            ensureIsland()
+            flagScene?.show(flag, on)
+        }
         live = Live(this, prefs, { n, pkg -> n.getLargeIcon()?.loadDrawable(this)?.let { bitmap(it) } ?: appIcon(pkg) }) { island?.refresh() }
         watch = Watch(this, prefs, brief = { k, t -> briefs?.show(k, t) }, lowBattery = { lowBattery(it) }, battery = { l, c ->
             pc.battery(l, c)
@@ -107,6 +126,9 @@ class Listener : NotificationListenerService() {
             pc.start()
             radios.start()
             github.start()
+            capture.start()
+            volume.start()
+            flags.start()
             try { activeNotifications?.forEach { live.posted(it) } } catch (_: Exception) { }
             ensureIsland()
         } else {
@@ -118,6 +140,9 @@ class Listener : NotificationListenerService() {
             pc.stop()
             radios.stop()
             github.stop()
+            capture.stop()
+            volume.stop()
+            flags.stop()
             live.clear()
         }
         Tile.refresh(this)
@@ -142,6 +167,9 @@ class Listener : NotificationListenerService() {
         pc.stop()
         radios.stop()
         github.stop()
+        capture.stop()
+        volume.stop()
+        flags.stop()
         live.clear()
         media?.stop()
         media = null
@@ -189,6 +217,13 @@ class Listener : NotificationListenerService() {
         privacyScene = pv
         isl.register(br)
         isl.register(pv)
+        // System notices: the screenshot card, the volume bar, and the one
+        // line a mode switch gets
+        shots = io.github.odlaver.tepi.scene.ShotScene(isl) { shot ->
+            isl.open(Capture.share(shot))
+        }.also { isl.register(it) }
+        volumeScene = io.github.odlaver.tepi.scene.VolumeScene(isl).also { isl.register(it) }
+        flagScene = io.github.odlaver.tepi.scene.FlagScene(isl).also { isl.register(it) }
         isl.register(AgentScene(isl, pc))
         translateScene = io.github.odlaver.tepi.scene.TranslateScene(isl).also { isl.register(it) }
         isl.home.rows.add(AgentRow(isl, pc))
