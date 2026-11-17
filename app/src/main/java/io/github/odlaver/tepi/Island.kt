@@ -964,18 +964,20 @@ class Island(
         out.reset()
         val w = now.width()
         val cx = now.centerX()
-        // Sideways: one block on the glass, with the top two corners flared
-        // outwards instead of rounded. The flare is what makes it read as part
-        // of the bezel rather than a card lying on top of the screen, and it
-        // is the same curve the neck uses where it meets the body, only turned
-        // to face the edge. It shrinks with the shape so a closing panel never
-        // flares wider than the block it is leaving behind.
+        // Sideways: one block on the glass, with the top two corners square
+        // and flared outwards instead of rounded. The flare is what makes it
+        // read as part of the bezel rather than a card lying on top of the
+        // screen, and it is the same curve the neck uses where it meets the
+        // body, only turned to face the edge. Rounding those corners as well
+        // would curve the shape away from the glass just where the flare is
+        // sweeping towards it, leaving a bite of wallpaper between the two;
+        // and there is nothing up there for a radius to show, because the edge
+        // is off the screen. It shrinks with the shape so a closing panel
+        // never flares wider than the block it is leaving behind.
         if (landscape) {
             if (w < 1f || now.height() < 1f) return
-            val r = min(radB.value, min(w, now.height()) / 2)
             box.set(now.left, 0f, now.right, now.bottom)
-            out.addRoundRect(box, r, r, Path.Direction.CW)
-            ui.flare(out, box, min(ui.glassFlare, min(w / 2, now.height())))
+            ui.block(out, box, radB.value, min(ui.glassFlare, min(w / 2, now.height())))
             return
         }
         val nk = neck.value.coerceIn(0f, w)

@@ -10,19 +10,20 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
-// One eye, and what it is doing.
+// A pair of eyes, and what they are doing.
 //
-// Tepi's own face in the app is a pair of these; the landscape notch has room
-// for one, so this is the single-eye version of the same idea: a white oval,
-// taller than it is wide, that blinks on a timer and changes shape when
-// something happens to the phone.
+// The same face Tepi wears in the app, drawn into the landscape notch: two
+// white ovals, taller than they are wide, that blink on a timer and change
+// shape when something happens to the phone. Both are always drawn
+// identically — a pair that blinks or glares out of step is not a face being
+// expressive, it is a face with something wrong with it.
 //
 // Four moods, and the order between them matters more than the drawing does:
 //
-//   Calm      the resting oval, blinking every seven seconds
-//   Startled  a notification from another app: the eye widens, then settles
-//   Angry     the battery is nearly gone: a red crescent with a heavy lid
-//   Happy     the notch was tapped: a plump upward crescent for three seconds
+//   Calm      the resting ovals, blinking every seven seconds
+//   Startled  a notification from another app: the eyes widen, then settle
+//   Angry     the battery is nearly gone: red crescents with heavy lids
+//   Happy     the notch was tapped: plump upward crescents for three seconds
 //
 // Startled and Happy are events with a deadline, Angry is a state that lasts
 // as long as the battery does. Events win while they last, so a tap still gets
@@ -35,10 +36,10 @@ import kotlin.math.sin
 // construction read in opposite directions: two curves bowing the same way,
 // the far one further than the near one, so the shape is fat in the middle and
 // runs out to nothing at the two ends. Bowed down with sharp ends it is a
-// scowl; bowed up with round ends it is a smile. That is also why the angry
-// mood has no brow any more — a crescent lid is already the scowl, and a
-// separate stroke floating above it was a second eyebrow on a face with one
-// eye.
+// scowl; bowed up with round ends it is a smile. Because it is one
+// construction, the numbers that make it can be interpolated, and the change
+// between any two moods is the curve bending rather than one picture replacing
+// another.
 //
 // Everything is a spring rather than a frame count, so the shape is always
 // somewhere sensible even when two things happen at once, and the caller only
@@ -52,9 +53,9 @@ class Eye(private val ui: Ui) {
     // How wide the eye is against its resting size; the startle is a jump to
     // a little over 1 and a settle back
     private val size = Spring(1f, 0.004f, 420f, 26f)
-    // Crossfade from the oval to the happy crescent
+    // How far the curve has bent into the happy crescent
     private val joy = Spring(0f, 0.004f, 420f, 32f)
-    // Crossfade from the oval to the angry crescent. Slower than joy: a glare
+    // How far it has bent into the angry one. Slower than joy: a glare
     // settling in should feel like a mood arriving, not a shape snapping.
     private val glare = Spring(0f, 0.004f, 260f, 30f)
     // Red tint
@@ -176,82 +177,169 @@ class Eye(private val ui: Ui) {
     // blinks or glares out of step is not a face being expressive, it is a
     // face with something wrong with it; the two reading as one is the whole
     // reason a pair is better than a single eye here.
+    //
+    // The gap is worked out from the width the shapes are actually being drawn
+    // at, not from a constant: the crescents are half again as wide as the
+    // resting oval, and a gap sized for the oval has them growing into each
+    // other until the pair reads as one smudge. Air between the two is what is
+    // held constant instead, so they slide apart as they curve and back
+    // together as they settle.
     fun draw(c: Canvas, cx: Float, cy: Float, h: Float, a: Float) {
         if (h <= 0f || a <= 0.01f) return
-        val gap = h * size.value.coerceIn(0.5f, 2f) * GAP
-        one(c, cx - gap / 2, cy, h, a)
-        one(c, cx + gap / 2, cy, h, a)
+        val full = h * size.value.coerceIn(0.5f, 2f)
+        val f = form(full)
+        // The air is held, so the gap is whatever the shapes are actually as
+        // wide as plus that. The stroke counts: it puffs the smile out by half
+        // of itself on each side, which is a whole stroke of width between the
+        // two eyes.
+        val gap = full * f.wide + f.stroke + h * AIR
+        one(c, cx - gap / 2, cy, full, a, f)
+        one(c, cx + gap / 2, cy, full, a, f)
     }
 
-    // How wide a pair is in total, against the resting height of one eye: the
-    // gap between the two centres plus the widest either of them gets. The
-    // caller needs this to know whether a face fits where it is going, and
-    // working it back out of these constants on the other side of the call is
-    // how the two drift apart.
-    fun pairWidth(h: Float) = h * (GAP + WIDTH * MAX_SPREAD) * MAX_GROWTH
+    // How wide a pair is at its widest moment, against the resting height of
+    // one eye: the air between them plus the two widest shapes either of them
+    // gets, grown by a startle. The caller needs this to know whether a face
+    // fits where it is going, and working it back out of these constants on
+    // the other side of the call is how the two drift apart.
+    fun pairWidth(h: Float) = h * (AIR + 2f * SPAN * MAX_GROWTH)
 
-    // One eye, in whatever shape the moods have settled on
-    private fun one(c: Canvas, cx: Float, cy: Float, h: Float, a: Float) {
-        val k = size.value.coerceIn(0.5f, 2f)
-        val full = h * k
-        val w = full * WIDTH
-        val open = lid.value.coerceIn(0f, 1f)
+    // The shape both eyes are drawn with, worked out once a frame.
+    //
+    // One holder rather than a pair of local sets: the two eyes are
+    // deliberately identical, and the gap between them has to come from the
+    // same width the paths are drawn at or the two drift and the eyes touch.
+    private class Shape {
+        // Whether the resting oval is still being drawn underneath the curve
+        var rest = 1f
+        // Path width, against the eye's grown height
+        var wide = 0f
+        // Where the two ends sit, positive being below the eye line, and the
+        // control points of the upper and lower edges
+        var tip = 0f
+        var up = 0f
+        var lo = 0f
+        // The round stroke that thickens the smile and blunts its ends, in px
+        var stroke = 0f
+    }
+
+    private val drawn = Shape()
+
+    // Where the moods have got to, as one shape rather than three.
+    //
+    // Not a crossfade. Three finished shapes faded over each other means two
+    // translucent eyes on top of one another for the whole transition, which
+    // does not read as an eye changing shape — it reads as one picture being
+    // swapped for another, and at these sizes that is a flicker. The scowl and
+    // the smile are already the same two-curve construction, so the numbers
+    // that make it are interpolated instead and the eye is a single opaque
+    // path that bends.
+    //
+    // What it bends out of is the oval itself, not a flat line. Two quadratics
+    // bowing away from each other by exactly the oval's half-height are a lens
+    // the same size and shape as the oval, so the curve starts life as the
+    // resting eye and leaves it by unbending: the silhouette never jumps and
+    // never pinches thinner than where it is going. The oval is still drawn
+    // underneath for the first part of the move, because the lens is a hair
+    // narrower than a true ellipse at the ends and the blink lives in it.
+    //
+    // Joy is applied over the glare rather than beside it, so a tap on a dying
+    // phone reads as the smile winning; between the two the curve passes
+    // through the resting oval, which is a frown unbending, which is what it
+    // should look like.
+    private fun form(full: Float): Shape {
         val j = joy.value.coerceIn(0f, 1f)
         val g = glare.value.coerceIn(0f, 1f)
-        val tint = colour()
-
-        // Three shapes crossfaded rather than one shape morphed: each is
-        // always drawn correctly on its own, where a single path bent between
-        // an oval, a scowl and a smile is wrong in the middle of every
-        // transition. Joy is applied last and over everything, so a tap during
-        // a glare reads as the smile winning.
-        val rest = (1f - j) * (1f - g)
         val scowl = (1f - j) * g
+        val cres = (j + scowl).coerceIn(0f, 1f)
+        // Which crescent the curve is heading for, where 1 is all smile
+        val pj = if (cres > 0.001f) (j / cres).coerceIn(0f, 1f) else 0f
+        drawn.rest = (1f - cres / HANDOVER).coerceIn(0f, 1f)
+        drawn.wide = WIDTH * lerp(1f, DEVIL_W * (1f - pj) + HAPPY_W * pj, cres)
+        drawn.tip = lerp(0f, -DEVIL_TIP * (1f - pj) + HAPPY_TIP * pj, cres)
+        // From the oval's own two edges out to the crescent's control points.
+        // A quadratic sits halfway between its control point and the chord, so
+        // a control point at twice the half-height draws an edge through the
+        // oval's own: that is where these two start.
+        drawn.up = lerp(-1f, DEVIL_LID * (1f - pj) - HAPPY_TOP * pj, cres)
+        drawn.lo = lerp(1f, DEVIL_FLOOR * (1f - pj) - HAPPY_BOT * pj, cres)
+        // The floor in dp is what makes the stroke visible at all on the
+        // smallest setting, where the fraction comes out under a pixel. It
+        // comes in with the smile, so the scowl keeps its points.
+        drawn.stroke = max(ui.dp(1f), full * HAPPY_PUFF) * j
+        return drawn
+    }
 
-        if (rest > 0.01f) {
-            // A blink is a line, not nothing: the height has a floor in the
-            // eye's own units and a second one in dp, because the smallest
-            // notch with the smallest eye in it is a shape only a few dp tall
-            // and a fourteen per cent slice of that is under a pixel
-            val eh = max(max(full * LINE, ui.dp(BLINK_FLOOR)), full * open)
-            oval.set(cx - w / 2, cy - eh / 2, cx + w / 2, cy + eh / 2)
-            solid.color = ui.alpha(tint, a * rest)
+    private fun lerp(from: Float, to: Float, k: Float) = from + (to - from) * k
+
+    // One eye, in whatever shape the moods have settled on. The height passed
+    // in is the grown one, so the startle is already in it.
+    private fun one(c: Canvas, cx: Float, cy: Float, full: Float, a: Float, f: Shape) {
+        val open = lid.value.coerceIn(0f, 1f)
+        val colour = ui.alpha(colour(), a)
+
+        // How far the lid has the shape squeezed towards the eye line.
+        //
+        // A blink is a line, not nothing, so there are two floors under it:
+        // one in the eye's own units and one in dp, because the smallest notch
+        // with the smallest eye in it is a shape only a few dp tall and a
+        // fourteen per cent slice of that is under a pixel. They are applied
+        // here, to the squeeze itself, rather than to the oval alone — the
+        // oval is held inside the curve's band, so a floor the curve did not
+        // also get would simply be clamped back off again.
+        val floor = max(LINE, if (full > 1f) ui.dp(BLINK_FLOOR) / full else LINE)
+        val squeeze = max(floor, open)
+        // The curve, built first because the oval behind it is measured
+        // against it. Two quadratics bowing away from each other, the far one
+        // further than the near one, so the shape is fat in the middle and
+        // runs out towards its two ends. At rest the two bow by exactly the
+        // oval's half-height and the shape is the oval itself; bowed down with
+        // its ends swept up it is the devil's scowl; bowed up with its ends
+        // dipped and drawn plump it is the smile. The whole thing is squeezed
+        // towards the eye line by the lid, so a glare can still blink.
+        val half = full * f.wide / 2
+        val tip = cy + full * f.tip * squeeze
+        val upper = cy + full * f.up * squeeze
+        val lower = cy + full * f.lo * squeeze
+
+        if (f.rest > 0.01f) {
+            // The resting oval, held inside the curve's own band and centred
+            // on it.
+            //
+            // The oval is underneath only to fill the lens's slightly pinched
+            // ends, so it must never be the taller of the two: if it were,
+            // dropping it at the hand-over would be the shape jumping down a
+            // fifth of its height in one frame, which is the flicker this is
+            // all here to get rid of. Inside the band, the hand-over is
+            // invisible. The blink's floors are in the squeeze above rather
+            // than here, so the band carries them too.
+            //
+            // A quadratic sits halfway between its control point and the
+            // chord, so the band is those two midpoints.
+            val top = min(tip, (tip + upper) / 2)
+            val bottom = max(tip, (tip + lower) / 2)
+            val mid = (top + bottom) / 2
+            val eh = bottom - top
+            val w = full * WIDTH
+            oval.set(cx - w / 2, mid - eh / 2, cx + w / 2, mid + eh / 2)
+            solid.color = colour
             c.drawOval(oval, solid)
         }
 
-        if (scowl > 0.01f) {
-            // The devil's eye: a crescent with its ends swept up above the eye
-            // line and its body sagging below it, both edges bowing down and
-            // the lower one bowing further. The ends are left sharp — that is
-            // the point of it — and the whole thing is squeezed towards the
-            // eye line by the lid, so a glare can still blink.
-            val squeeze = max(LINE, open)
-            val half = w * DEVIL_W / 2
-            val tip = cy - full * DEVIL_TIP * squeeze
-            path.reset()
-            path.moveTo(cx - half, tip)
-            path.quadTo(cx, cy + full * DEVIL_LID * squeeze, cx + half, tip)
-            path.quadTo(cx, cy + full * DEVIL_FLOOR * squeeze, cx - half, tip)
-            path.close()
-            solid.color = ui.alpha(tint, a * scowl)
-            c.drawPath(path, solid)
-        }
-
-        if (j > 0.01f) {
-            // Happy is a closed eye: the same crescent turned over, bowing up
-            // with its ends dipped, and drawn plump with round ends so it
-            // reads as a bubble of a smile rather than a sliver of the oval.
-            val half = w * HAPPY_W / 2
-            val tip = cy + full * HAPPY_TIP
-            path.reset()
-            path.moveTo(cx - half, tip)
-            path.quadTo(cx, cy - full * HAPPY_TOP, cx + half, tip)
-            path.quadTo(cx, cy - full * HAPPY_BOT, cx - half, tip)
-            path.close()
-            plump.strokeWidth = max(ui.dp(1f), full * HAPPY_PUFF)
-            plump.color = ui.alpha(tint, a * j)
-            c.drawPath(path, plump)
-        }
+        path.reset()
+        path.moveTo(cx - half, tip)
+        path.quadTo(cx, upper, cx + half, tip)
+        path.quadTo(cx, lower, cx - half, tip)
+        path.close()
+        // Filled and then stroked with a round join, which rounds the two ends
+        // and puffs the shape out by half a stroke on each side: the difference
+        // between a cute curve and a sharp one. It comes in with the smile, so
+        // the scowl keeps its points. The width is the same one draw() budgeted
+        // for in the gap, so the air between the two eyes does not shift as the
+        // stroke arrives.
+        val p = if (f.stroke > 0.3f) plump.also { it.strokeWidth = f.stroke } else solid
+        p.color = colour
+        c.drawPath(path, p)
     }
 
     // White at rest, red as the battery goes. The critical level breathes
@@ -300,13 +388,33 @@ class Eye(private val ui: Ui) {
         // Oval width over its height: taller than wide, the way Tepi's own
         // pair are drawn in the app
         private const val WIDTH = 0.62f
-        // Between the two eye centres, against the resting height of one. A
-        // shade wider than one eye, which is what keeps the pair reading as
-        // two eyes rather than as one wide blur.
-        private const val GAP = 0.86f
-        // The widest any single shape gets against the oval's own width: the
-        // happy crescent plus its puff. Used for the pair's total width.
-        private const val MAX_SPREAD = 1.70f
+        // Clear space between the two eyes, against the resting height of one.
+        //
+        // The air, not the distance between the centres. A fixed centre
+        // distance is only right for one shape, and the crescents are half
+        // again as wide as the oval it was measured from: the smile overlapped
+        // its twin by a sixth of an eye and the scowl's two points met in the
+        // middle, which is where the pair stopped reading as two eyes. Holding
+        // the gap instead means every mood keeps the spacing the resting pair
+        // was tuned to, and the eyes slide apart as they curve.
+        private const val AIR = 0.24f
+        // The widest any single shape gets, against the resting height: the
+        // happy crescent grown by a startle, plus the stroke that puffs it.
+        // Rounded up rather than worked out exactly, because the stroke has a
+        // floor in dp and so is a larger share of a small eye than of a big
+        // one; the budget has to cover the smallest setting on the densest
+        // screen, which is where that floor bites hardest.
+        private const val SPAN = 1.18f
+        // How far into a mood change the resting oval stops being drawn.
+        //
+        // It is not a fade: the curve begins as a lens the size of the oval
+        // and the oval is only underneath it to fill the lens's slightly
+        // pinched ends, so once the shape has bent appreciably out of the
+        // resting one the oval is a blob behind a smile rather than part of
+        // it. A third of the way is where the curve is unmistakably its own
+        // shape and still the taller of the two, so the hand-over does not
+        // show.
+        private const val HANDOVER = 0.34f
         // Thinnest the eye gets: a blink is a line, not nothing at all, as a
         // fraction of the height and as a hard floor in dp for the settings
         // where that fraction comes out under a pixel

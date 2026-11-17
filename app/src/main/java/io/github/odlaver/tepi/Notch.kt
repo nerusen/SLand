@@ -31,10 +31,10 @@ import kotlin.math.min
 // the phone looking like Tepi had been switched off.
 //
 // This is the other answer: a small rounded block hanging from the middle of
-// the top edge, the shape an iPhone 12's notch has, with one eye in it. It
-// says nothing and holds nothing — there is no room for a panel out here and
-// no good place to put one — but it is awake, it blinks, and it reacts, so the
-// phone still looks like it has Tepi on it. Tapping it either opens the
+// the top edge, the shape an iPhone 12's notch has, with a pair of eyes in it.
+// It says nothing and holds nothing — there is no room for a panel out here
+// and no good place to put one — but it is awake, it blinks, and it reacts, so
+// the phone still looks like it has Tepi on it. Tapping it either opens the
 // island's menu or just makes it smile, which is a switch because the two
 // wants are opposite: one is a shortcut, the other must never get in the way
 // of a game.
@@ -146,18 +146,21 @@ class Notch(
 
             val cap = min(body.width(), body.height()) / 2f
             // The two free corners, hanging away from the glass, carry the
-            // real radius: they are the whole silhouette of the thing.
+            // real radius: they are the whole silhouette of the thing. The two
+            // on the glass are square, and flare outwards instead of rounding
+            // inwards, so the block grows out of the bezel rather than sitting
+            // on top of it — rounding them as well would curve the shape away
+            // from the glass exactly where the flare is sweeping towards it
+            // and punch a notch of wallpaper out between the two.
+            //
+            // The flare shrinks with the shape, so it is never wider than the
+            // block it is flaring from. It has to clear the depth as well as
+            // the half-length: a flare taller than the block it hangs off
+            // would reach past the block's own bottom edge and read as two
+            // legs rather than a join.
             val r = min(dep * CORNER, cap)
             shape.reset()
-            shape.addRoundRect(body, r, r, Path.Direction.CW)
-            // ...and the two on the glass flare outwards instead of rounding
-            // inwards, so the block grows out of the bezel rather than sitting
-            // on top of it. The flare shrinks with the shape, so it is never
-            // wider than the block it is flaring from.
-            // The flare has to clear the depth as well as the half-length: a
-            // flare taller than the block it hangs off would reach past the
-            // block's own bottom edge and read as two legs rather than a join
-            ui.flare(shape, body, min(f * k, min(len / 2, dep)))
+            ui.block(shape, body, r, min(f * k, min(len / 2, dep)))
             canvas.drawPath(shape, bg)
 
             // The eyes, centred. Their height comes from the block's depth,
@@ -229,12 +232,13 @@ class Notch(
     // The length is the loose one, and it only exists because there are two
     // eyes now: a pair is roughly three times as wide as one, which is still
     // comfortable inside a block four times longer than it is deep, but the
-    // check costs nothing and a future smaller block would need it.
+    // check costs nothing — and the pair now spreads as the crescents widen,
+    // so the widest it ever gets is worth asking for rather than assuming.
     private fun eyeHeight(depth: Float, length: Float): Float {
         val scale = prefs.notchEye.coerceIn(Prefs.NOTCH_EYE_MIN, Prefs.NOTCH_EYE_MAX) / 100f
         val tall = depth * EYE_ROOM / (Eye.MAX_GROWTH * Eye.MAX_EXTENT)
-        // pairWidth is for one unit of height, so dividing gives the height
-        // the available length can afford
+        // pairWidth is for one unit of resting height, so dividing gives the
+        // height the available length can afford
         val long = length * EYE_SPAN / max(1f, eye.pairWidth(1f))
         return min(depth * EYE_H * scale, min(tall, long))
     }
@@ -303,9 +307,9 @@ class Notch(
     // block grows out of the glass.
     fun show(grown: Boolean) {
         wanted = true
-        grow.target = 1f
-        look.target = 1f
         if (attached) {
+            grow.target = 1f
+            look.target = 1f
             place(false)
             retouch()
             kick()
@@ -313,9 +317,18 @@ class Notch(
         }
         place(true)
         // Arriving from nothing: start collapsed into the glass so the first
-        // frame is the shape opening rather than the shape appearing
+        // frame is the shape opening rather than the shape appearing.
+        //
+        // Snapped before the targets are set, never after. snap() takes the
+        // target with it, so snapping last parked both springs where they
+        // stood and left them there: handed a grown shape, that was a black
+        // block with no face on it until something else happened to ask for a
+        // refresh. Closing the panel by tapping the island again asked twice
+        // and so repaired itself; tapping outside it asked once and did not.
         grow.snap(if (grown) 1f else 0f)
         look.snap(0f)
+        grow.target = 1f
+        look.target = 1f
         try {
             wm.addView(face, lp)
             attached = true

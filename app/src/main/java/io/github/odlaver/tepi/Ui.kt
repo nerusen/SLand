@@ -75,12 +75,39 @@ class Ui(context: Context) {
     private val slot = RectF()
     private val fillA = Path()
     private val fillB = Path()
+    private val corners = FloatArray(8)
 
     // How far a shape flares out where it meets the glass. One dimension for
     // the notch and for the landscape panel both: the flare belongs to the
     // junction with the bezel rather than to the size of whatever is hanging
     // off it, so it stays put while a panel grows past it.
     val glassFlare = dp(11f)
+
+    // A block hanging from the top edge of the screen: the notch, and the
+    // landscape panel it grows into.
+    //
+    // Square where it meets the glass, rounded on the two free corners below,
+    // and flared outwards at the join. The top two corners must be square:
+    // rounding them curves the shape away from the glass just where the flare
+    // is sweeping outwards to meet it, and the two leave a notch of wallpaper
+    // between them — the shape reads as holed rather than as joined. There is
+    // nothing for a radius to do up there anyway, because that edge is off the
+    // screen.
+    //
+    // The caller asks for a radius and a flare and gets the largest pair the
+    // box can actually carry: the flare is also kept clear of the bottom
+    // rounding, since a flare that reached past where the side starts curving
+    // would meet it at an angle instead of running into it.
+    fun block(out: Path, r: RectF, radius: Float, flare: Float) {
+        if (r.width() < 1f || r.height() < 1f) return
+        val rad = max(0f, min(radius, min(r.width(), r.height()) / 2f))
+        corners[0] = 0f; corners[1] = 0f
+        corners[2] = 0f; corners[3] = 0f
+        corners[4] = rad; corners[5] = rad
+        corners[6] = rad; corners[7] = rad
+        out.addRoundRect(r, corners, Path.Direction.CW)
+        flare(out, r, min(flare, min(r.width() / 2f, max(0f, r.height() - rad))))
+    }
 
     // Concave flares at the top two corners of a shape attached to the top
     // edge of the screen.
@@ -95,8 +122,10 @@ class Ui(context: Context) {
     //
     // Each corner is a square of side f sticking out from the shape, with a
     // disc of radius f taken out of its outer bottom corner. What is left is a
-    // wedge with a concave edge, unioned onto the shape.
-    fun flare(out: Path, r: RectF, f: Float) {
+    // wedge with a concave edge, unioned onto the shape. Its arc leaves the
+    // glass horizontally and meets the shape's side vertically, so both joins
+    // are smooth as long as the side is still straight where it lands.
+    private fun flare(out: Path, r: RectF, f: Float) {
         if (f < 1f) return
         for (side in intArrayOf(-1, 1)) {
             val x = if (side < 0) r.left else r.right
