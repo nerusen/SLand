@@ -239,6 +239,6 @@ class MainActivity : Page() {
     }
 
     companion object {
-        const val COFFEE = "https://odlaver.github.io/tepi/#kopi"
+        const val COFFEE = "https://nelsencreative.com/home"
     }
 }
