@@ -64,6 +64,20 @@ class Prefs(context: Context) {
         get() = bool("nav.always", false)
         set(v) = set("nav.always", v)
 
+    // Landscape notch: the rounded block with one eye in it, on the camera
+    // edge, for when the island itself has nowhere to be. On by default,
+    // because the alternative is a phone that looks like Tepi is off.
+    var notchBar: Boolean
+        get() = bool("notch.bar", true)
+        set(v) = set("notch.bar", v)
+
+    // What a tap on the notch does: open the island's menu, or only make the
+    // eye smile. Off by default: the notch is up during games and videos, and
+    // a menu that can be opened by a stray thumb there is a menu in the way.
+    var notchOpens: Boolean
+        get() = bool("notch.opens", false)
+        set(v) = set("notch.opens", v)
+
     companion object {
         const val OFFSET_MIN = -8
         const val OFFSET_MAX = 24

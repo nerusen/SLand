@@ -11,14 +11,18 @@ import io.github.odlaver.tepi.Shot
 import java.text.DateFormat
 import java.util.Date
 
-// The screenshot just taken: square thumbnail, its details, two actions.
+// The screenshot just taken: square thumbnail, its details, three actions.
 //
-// Thumbnail hard left, name and figures beside it, Open and Share as round
-// chips on the right. The chips are icons rather than a pair of labelled
+// Thumbnail hard left, name and figures beside it, Open, Share and Save to
+// shelf as round chips on the right. The chips are icons rather than labelled
 // buttons on a second line: that keeps the card one row tall, which is what
 // lets it appear and leave without the island growing into a panel the user
 // then has to read.
-class ShotScene(host: Host, private val share: (Shot) -> Unit) : Scene(host) {
+//
+// Save to shelf is here because a capture is most often taken to be passed on,
+// and the shelf is where Tepi keeps things on their way somewhere: it copies
+// the file into the app, so the picture survives the gallery being tidied up.
+class ShotScene(host: Host, private val share: (Shot) -> Unit, private val save: (Shot) -> Unit) : Scene(host) {
     override val id = "shot"
     // Above messages and alerts, below an incoming call: a capture is a direct
     // answer to a button press, so it should not be made to queue
@@ -32,6 +36,7 @@ class ShotScene(host: Host, private val share: (Shot) -> Unit) : Scene(host) {
     private val tmp = RectF()
     private val hitOpen = RectF()
     private val hitShare = RectF()
+    private val hitSave = RectF()
     private val hitCard = RectF()
 
     private val drop = Runnable { shot = null; host.refresh() }
@@ -68,11 +73,16 @@ class ShotScene(host: Host, private val share: (Shot) -> Unit) : Scene(host) {
         }
 
         val gap = ui.s8
+        // Three chips, right to left: Share, Save to shelf, then Open nearest
+        // the text. Open keeps the filled chip, so the likely action is still
+        // the one the eye lands on first.
         hitShare.set(r.right - chip, r.top + (thumbS - chip) / 2, r.right, r.top + (thumbS + chip) / 2)
-        hitOpen.set(hitShare.left - gap - chip, hitShare.top, hitShare.left - gap, hitShare.bottom)
-        // Open is the likely one, so it carries the filled chip
+        hitSave.set(hitShare.left - gap - chip, hitShare.top, hitShare.left - gap, hitShare.bottom)
+        hitOpen.set(hitSave.left - gap - chip, hitShare.top, hitSave.left - gap, hitShare.bottom)
         ui.fill(c, hitOpen, chip / 2, ui.ink, a)
         ui.icon(c, Icon.Open, hitOpen.centerX(), hitOpen.centerY(), ui.dp(16f), android.graphics.Color.BLACK, a)
+        ui.fill(c, hitSave, chip / 2, ui.fillStrong, a)
+        ui.icon(c, Icon.Shelf, hitSave.centerX(), hitSave.centerY(), ui.dp(16f), ui.ink, a)
         ui.fill(c, hitShare, chip / 2, ui.fillStrong, a)
         ui.icon(c, Icon.Share, hitShare.centerX(), hitShare.centerY(), ui.dp(16f), ui.ink, a)
 
@@ -105,6 +115,9 @@ class ShotScene(host: Host, private val share: (Shot) -> Unit) : Scene(host) {
         val s = shot ?: return false
         when {
             hitShare.contains(x, y) -> { host.haptic(); share(s); gone() }
+            // The copy is made off the main thread by the caller, so the card
+            // can leave straight away
+            hitSave.contains(x, y) -> { host.haptic(); save(s); gone() }
             hitOpen.contains(x, y) || hitCard.contains(x, y) -> {
                 host.haptic()
                 host.open(Capture.open(s))

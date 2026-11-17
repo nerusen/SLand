@@ -78,7 +78,12 @@ class Capture(private val context: Context, private val prefs: Prefs, private va
         if (!started || SystemClock.uptimeMillis() < readyAt) return
         Thread {
             val found = read()
-            if (found != null) main.post { if (started) shot(found) }
+            if (found != null) main.post {
+                // The grid is a capture behind now; let the tab rebuild it the
+                // next time it is drawn
+                loadedAt = 0L
+                if (started) shot(found)
+            }
         }.start()
     }
 
@@ -145,14 +150,118 @@ class Capture(private val context: Context, private val prefs: Prefs, private va
         context.contentResolver.loadThumbnail(uri, Size(side, side), null)
     } catch (_: Exception) { null }
 
+    // The last few screenshots, for the grid tab.
+    //
+    // Separate from the watcher: that one reports a single fresh capture and
+    // deliberately ignores everything already in the gallery, while the tab
+    // wants the recent ones whenever it is opened. Both the query and the
+    // thumbnail decodes are disk work, so the list is built on a background
+    // thread and handed back on the main one; the tab keeps whatever it was
+    // last given until the new list arrives, so opening it never blocks a
+    // frame.
+    private var recent: List<Shot> = emptyList()
+    private var loading = false
+    private var loadedAt = 0L
+
+    val shots: List<Shot> get() = recent
+
+    // Whether the grid tab is worth listing: the read has to be granted, and
+    // the tab has its own switch apart from the card's.
+    //
+    // Asked several times per frame, by the page list as well as by the tab
+    // bar, so the permission answer is kept for a few seconds rather than
+    // checked each time. A grant arrives through the settings page, which
+    // restarts the watcher anyway, so a stale yes or no is never more than
+    // this far behind.
+    private var grantSeen = false
+    private var grantAt = 0L
+
+    fun tabOn(): Boolean {
+        if (!prefs.bool(TAB_KEY, true)) return false
+        val now = SystemClock.uptimeMillis()
+        if (now - grantAt > GRANT_MS) {
+            grantSeen = allowed(context)
+            grantAt = now
+        }
+        return grantSeen
+    }
+
+    // Called when the tab is drawn. A reload is only started when the list is
+    // stale, so a panel redrawing at 60 fps does not queue sixty queries.
+    fun refresh(changed: () -> Unit) {
+        if (!tabOn()) { recent = emptyList(); return }
+        if (loading || SystemClock.uptimeMillis() - loadedAt < LIST_MS) return
+        loading = true
+        Thread {
+            val list = list()
+            main.post {
+                loading = false
+                loadedAt = SystemClock.uptimeMillis()
+                recent = list
+                changed()
+            }
+        }.start()
+    }
+
+    // Newest screenshots first, thumbnails included
+    private fun list(): List<Shot> {
+        val cols = arrayOf(
+            MediaStore.Images.Media._ID,
+            MediaStore.Images.Media.DISPLAY_NAME,
+            MediaStore.Images.Media.SIZE,
+            MediaStore.Images.Media.DATE_ADDED,
+            MediaStore.Images.Media.RELATIVE_PATH,
+        )
+        val out = ArrayList<Shot>()
+        try {
+            context.contentResolver.query(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cols, null, null,
+                "${MediaStore.Images.Media.DATE_ADDED} DESC, ${MediaStore.Images.Media._ID} DESC",
+            )?.use { c ->
+                val idCol = c.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                val nameCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+                val sizeCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
+                val dateCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+                val pathCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)
+                // Rows are scanned, not limited in SQL: MediaStore validates
+                // the sort order strictly from Android 11. The scan is capped
+                // as well, so a gallery of thousands of pictures without a
+                // single screenshot cannot turn this into a full table read.
+                var seen = 0
+                while (c.moveToNext() && out.size < LIST_MAX && seen < LIST_SCAN) {
+                    seen++
+                    val name = c.getString(nameCol) ?: continue
+                    val path = c.getString(pathCol) ?: ""
+                    if (!isShot(path, name)) continue
+                    val id = c.getLong(idCol)
+                    val uri = android.content.ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+                    out.add(Shot(uri, name, c.getLong(sizeCol), c.getLong(dateCol) * 1000L, thumb(uri)))
+                }
+            }
+        } catch (_: Exception) { }
+        return out
+    }
+
     companion object {
         const val KEY = "act.shot"
+        // The grid tab of recent captures, on its own switch: the card is a
+        // notice, the tab is a place to go looking
+        const val TAB_KEY = "act.shots.tab"
 
         // How long after a capture the card is still worth showing
         private const val FRESH_MS = 20_000L
         private const val THUMB_DP = 96f
         // Rows examined per look; a fresh capture is always at the very top
         private const val LOOK_ROWS = 4
+        // The grid: how many to show, how far to look for them, and how long
+        // a built list stays good. The cap is the widest grid the tab can draw
+        // at its own cell size, so it never asks for a thumbnail it cannot put
+        // anywhere.
+        private const val LIST_MAX = 12
+        private const val LIST_SCAN = 400
+        private const val LIST_MS = 20_000L
+        // How long the permission answer is trusted between checks
+        private const val GRANT_MS = 5000L
 
         // Reading the gallery needs the images permission from Android 13,
         // and the old storage one before that

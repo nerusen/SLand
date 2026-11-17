@@ -66,6 +66,15 @@ abstract class Scene(protected val host: Host) {
     open fun tap(x: Float, y: Float) = false
     open fun tapCompact() = false
 
+    // Finger landed on something the scene drags, like the volume track.
+    // Returning true hands the whole gesture over: the island stops reading
+    // the moves as its own swipes and forwards them here until the finger
+    // lifts, which is what lets a bar be scrubbed inside a shape that is
+    // otherwise entirely gestures.
+    open fun grab(x: Float, y: Float) = false
+    open fun drag(x: Float, y: Float) {}
+    open fun release() {}
+
     // Press and hold inside the open panel. True when the scene takes it; the
     // island's quick menu only opens when nothing under the finger did.
     open fun hold(x: Float, y: Float) = false

@@ -51,6 +51,27 @@ class Volume(private val context: Context, private val prefs: Prefs, private val
     // Which stream a given level belongs to, for the label
     val kind get() = stream
 
+    // Drag on the bar: set the live stream straight on AudioManager.
+    //
+    // FLAG_REMOVE_SOUND_AND_VIBRATE keeps the system's own slider from
+    // appearing on top of the island, and silences the sample tick that would
+    // otherwise fire on every step of a scrub. The call can be refused on the
+    // ringer stream while do not disturb is on, which is a policy the app has
+    // no business overriding, so a refusal is swallowed and the bar simply
+    // reports back whatever the stream really is.
+    fun set(level: Int) {
+        val a = audio ?: return
+        val max = try { a.getStreamMaxVolume(stream) } catch (_: Exception) { 0 }
+        if (max <= 0) return
+        try {
+            a.setStreamVolume(stream, level.coerceIn(0, max), AudioManager.FLAG_REMOVE_SOUND_AND_VIBRATE)
+        } catch (_: Exception) { }
+        report()
+    }
+
+    // Steps of the live stream, so a drag can be mapped onto them
+    val steps: Int get() = try { audio?.getStreamMaxVolume(stream) ?: 0 } catch (_: Exception) { 0 }
+
     fun start() {
         if (started) return
         started = true

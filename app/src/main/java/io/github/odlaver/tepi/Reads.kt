@@ -16,6 +16,7 @@ class Reads : Page() {
             Triple(R.string.shelf, R.string.reads_shelf, "Shelf.kt"),
             Triple(R.string.radio_names, R.string.reads_radios, "Radios.kt"),
             Triple(R.string.act_shot_perm, R.string.reads_shot, "Capture.kt"),
+            Triple(R.string.notch_bar, R.string.reads_notch, "Notch.kt"),
         )) {
             label(getString(title))
             val g = group()

@@ -22,7 +22,19 @@ import kotlin.math.roundToInt
 // The track's width is fixed, not measured from the value: a width that grew
 // with the level would make the island pulse on every press, right where the
 // eye is resting.
-class VolumeScene(host: Host) : Scene(host) {
+//
+// The track is also draggable, so the bar the buttons put up is the slider as
+// well: a press to call it, a scrub to land on the level wanted. The bar is
+// held open for as long as a finger is on it, because a slider that vanished
+// mid-drag would be worse than no slider at all.
+class VolumeScene(
+    host: Host,
+    // Steps of the stream being shown, and the setter for it. Both read the
+    // live stream rather than a copy, so a drag moves whatever the buttons
+    // were moving.
+    private val steps: () -> Int = { 0 },
+    private val setLevel: (Int) -> Unit = {},
+) : Scene(host) {
     override val id = "volume"
     override val priority = 93
 
@@ -35,6 +47,11 @@ class VolumeScene(host: Host) : Scene(host) {
     // The fill slides to the new value instead of jumping between steps
     private val fill = Spring(0f, 0.002f, 420f, 34f)
     private val tmp = RectF()
+    // Where the track was last drawn, and whether a finger is on it
+    private val track = RectF()
+    private var dragging = false
+    // Last step handed to AudioManager during a drag
+    private var sent = -1
 
     private val drop = Runnable { shown = false; host.refresh() }
 
@@ -44,23 +61,31 @@ class VolumeScene(host: Host) : Scene(host) {
         muted = silent
         stream = which
         if (!shown) fill.snap(frac())
-        fill.target = frac()
+        // Mid-drag the fill belongs to the finger. This is also the call the
+        // drag itself causes, through the setter and the broadcast that
+        // follows it, so letting it retarget here would pull the fill back to
+        // the nearest step on every step of a scrub.
+        if (!dragging) fill.target = frac()
         shown = true
         main.removeCallbacks(drop)
-        main.postDelayed(drop, SHOW_MS)
+        // A finger on the track holds the bar up; the timer is armed again
+        // when it lifts
+        if (!dragging) main.postDelayed(drop, SHOW_MS)
         host.refresh()
     }
 
     private fun frac() = (level.toFloat() / max).coerceIn(0f, 1f)
 
     override fun live() = shown
-    override fun dismiss() { shown = false; main.removeCallbacks(drop) }
+    override fun dismiss() { shown = false; dragging = false; main.removeCallbacks(drop) }
     // Not a page: it is gone long before anyone could swipe to it
     override fun tab() = false
     override fun tapCompact() = true
 
     override fun step(dt: Float): Boolean {
-        fill.target = frac()
+        // Mid-drag the fill is set by the finger, in apply; retargeting it
+        // from the stream here would fight the scrub
+        if (!dragging) fill.target = frac()
         return fill.step(dt)
     }
 
@@ -70,7 +95,11 @@ class VolumeScene(host: Host) : Scene(host) {
     override fun drawCompact(c: Canvas, left: RectF, right: RectF, a: Float) {
         val s = min(left.height(), ui.dp(20f))
         ui.icon(c, if (muted) Icon.Mute else Icon.Volume, left.left + s / 2, left.centerY(), s, ui.ink, a)
-        val pct = (frac() * 100).roundToInt()
+        // Mid-drag the figure is read off the track rather than the stream, so
+        // it lands on the step under the thumb instead of trailing the
+        // broadcast that confirms it
+        val k = if (dragging) fill.target.coerceIn(0f, 1f) else frac()
+        val pct = (k * 100).roundToInt()
         ui.textEnd(c, host.ctx.getString(R.string.percent, pct), ui.compact, right.right, ui.baseline(ui.compact, right.centerY()), a)
     }
 
@@ -93,8 +122,13 @@ class VolumeScene(host: Host) : Scene(host) {
 
         val barL = left + icon + gap
         val barR = right - icon - gap
-        if (barR <= barL) return
-        val h = ui.dp(4f)
+        if (barR <= barL) { track.setEmpty(); return }
+        // A drag goes for the thin track, so the hit area is grown to a
+        // thumb's worth of row rather than the four dp that are drawn
+        track.set(barL, r.top, barR, r.bottom)
+        // Thicker under the finger: the only cue a flat track can give that
+        // it is being held rather than merely watched
+        val h = if (dragging) ui.dp(7f) else ui.dp(4f)
         val rad = h / 2
         // Grey behind, white in front: the empty part of the track still
         // reads as track rather than as island
@@ -107,6 +141,59 @@ class VolumeScene(host: Host) : Scene(host) {
         tmp.right = barL + (barR - barL) * k
         if (tmp.right - tmp.left < h) tmp.right = tmp.left + h
         ui.fill(c, tmp, rad, ui.ink, a)
+    }
+
+    // The bar is the slider: a finger anywhere along the track takes the
+    // gesture, and the level follows it from that first touch rather than
+    // waiting for a move, so a tap partway along jumps straight there.
+    override fun grab(x: Float, y: Float): Boolean {
+        if (!shown || track.isEmpty || !track.contains(x, y)) return false
+        if (steps() <= 0) return false
+        dragging = true
+        sent = level
+        main.removeCallbacks(drop)
+        host.haptic()
+        apply(x)
+        return true
+    }
+
+    override fun drag(x: Float, y: Float) {
+        if (!dragging) return
+        apply(x)
+    }
+
+    override fun release() {
+        if (!dragging) return
+        dragging = false
+        // Back to a passing notice now the finger is gone
+        main.removeCallbacks(drop)
+        main.postDelayed(drop, SHOW_MS)
+        host.refresh()
+    }
+
+    // Finger position onto a step of the stream.
+    //
+    // AudioManager is told once per step, not once per frame: a scrub across a
+    // fifteen-step media stream is fifteen calls, not three hundred. The
+    // comparison is against what was last sent rather than against the level
+    // read back, because the read-back arrives by broadcast and a fast drag
+    // would otherwise send the same step several times while it catches up.
+    private fun apply(x: Float) {
+        val w = track.width()
+        if (w <= 0f) return
+        val top = steps()
+        if (top <= 0) return
+        val want = ((x - track.left) / w).coerceIn(0f, 1f)
+        val stepped = Math.round(want * top)
+        // Snapped, not raw: the fill shows the step the stream is actually on,
+        // so a coarse five-step ringer looks like the five steps it has
+        fill.target = stepped.toFloat() / top
+        if (stepped != sent) {
+            sent = stepped
+            host.haptic()
+            setLevel(stepped)
+        }
+        host.refresh()
     }
 
     override fun panelHeight(w: Float) = 0f

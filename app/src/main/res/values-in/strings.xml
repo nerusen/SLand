@@ -128,8 +128,9 @@
     <string name="reads_lyrics">Mengirim judul dan artis lagu ke LRCLIB, lalu NetEase. Lirik disimpan di HP.</string>
     <string name="reads_shelf">Menyimpan salinan yang kamu bagikan ke Tepi, di penyimpanan aplikasi. Terhapus bersama aplikasi.</string>
     <string name="reads_radios">Membaca status Wi-Fi dan Bluetooth beserta nama koneksinya, untuk dua kolom di Beranda. Tidak ada yang keluar dari HP.</string>
-    <string name="reads_shot">Membaca gambar terbaru di galeri untuk menampilkan kartu screenshot. Gambarnya tetap di HP; Tepi hanya menyerahkannya ke aplikasi yang kamu pilih dari Bagikan.</string>
+    <string name="reads_shot">Membaca gambar terbaru di galeri untuk menampilkan kartu screenshot, serta beberapa yang terakhir untuk tab screenshot. Gambarnya tetap di HP; Tepi hanya menyerahkan satu ke aplikasi yang kamu pilih dari Bagikan, atau menyalinnya ke Rak saat kamu minta.</string>
     <string name="reads_code">Kode: %1$s</string>
+    <string name="reads_notch">Membaca level baterai dan orientasi layar, supaya mata di poni mode landscape bisa berkedip, melebar, dan memerah. Mata itu hanya diberi tahu bahwa ada aplikasi lain mengirim sesuatu, bukan apa isinya atau siapa pengirimnya, dan tidak ada yang keluar dari HP.</string>
     <string name="reads_never_title">Tidak pernah</string>
     <string name="reads_never">Tepi tidak pernah membaca kata sandi, ketikan, atau layar aplikasi, dan tidak punya analitik.</string>
     <string name="t_focus">Fokus</string>
@@ -380,6 +381,15 @@
     <string name="shot_taken">Screenshot</string>
     <string name="size_kb">%1$.0f KB</string>
     <string name="size_mb">%1$.1f MB</string>
+    <string name="shot_shelved">Disimpan ke Rak</string>
+    <string name="shot_shelve_failed">Gagal menyimpan ke Rak</string>
+
+    <!-- Screenshot terakhir, sebagai tab grid -->
+    <string name="act_shots_tab">Tab screenshot</string>
+    <string name="act_shots_tab_sub">Satu halaman berisi screenshot terakhir Anda, bisa digeser saat island terbuka.</string>
+    <string name="tab_shots">Screenshot</string>
+    <string name="shots_empty">Belum ada screenshot. Ambil satu dan akan muncul di sini.</string>
+    <string name="gallery">Galeri</string>
 
     <!-- Volume -->
     <string name="act_volume">Volume</string>
@@ -415,4 +425,13 @@
     <string name="f_plane_off">Mode pesawat nonaktif</string>
     <string name="f_saver_on">Hemat daya aktif</string>
     <string name="f_saver_off">Hemat daya nonaktif</string>
+
+    <!-- Poni mode landscape, dan mata di dalamnya -->
+    <string name="notch">Mode landscape</string>
+    <string name="notch_bar">Poni saat landscape</string>
+    <string name="notch_bar_sub">Saat HP dimiringkan, island tidak punya tempat untuk tampil, jadi berubah menjadi persegi panjang kecil bersudut halus di sisi kamera dengan satu mata di tengahnya. Mata itu berkedip, melebar saat ada notifikasi dari aplikasi lain, dan memerah saat baterai hampir habis.</string>
+    <string name="notch_tap">Ketuk membuka menu</string>
+    <string name="notch_tap_on">Mengetuk poni akan membuka menu cepat island.</string>
+    <string name="notch_tap_off">Mengetuk poni hanya membuat matanya tersenyum. Tidak ada yang terbuka, jadi game atau video tidak pernah terganggu.</string>
+    <string name="notch_note">Poni tetap tampil di game, video, dan aplikasi layar penuh, yaitu saat island sendiri disembunyikan. Sembunyikan satu jam dari menu island juga ikut menyembunyikannya.</string>
 </resources>

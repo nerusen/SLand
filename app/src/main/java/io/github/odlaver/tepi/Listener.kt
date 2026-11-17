@@ -219,10 +219,10 @@ class Listener : NotificationListenerService() {
         isl.register(pv)
         // System notices: the screenshot card, the volume bar, and the one
         // line a mode switch gets
-        shots = io.github.odlaver.tepi.scene.ShotScene(isl) { shot ->
+        shots = io.github.odlaver.tepi.scene.ShotScene(isl, { shot ->
             isl.open(Capture.share(shot))
-        }.also { isl.register(it) }
-        volumeScene = io.github.odlaver.tepi.scene.VolumeScene(isl).also { isl.register(it) }
+        }) { shot -> shelve(shot) }.also { isl.register(it) }
+        volumeScene = io.github.odlaver.tepi.scene.VolumeScene(isl, { volume.steps }) { volume.set(it) }.also { isl.register(it) }
         flagScene = io.github.odlaver.tepi.scene.FlagScene(isl).also { isl.register(it) }
         isl.register(AgentScene(isl, pc))
         translateScene = io.github.odlaver.tepi.scene.TranslateScene(isl).also { isl.register(it) }
@@ -242,6 +242,10 @@ class Listener : NotificationListenerService() {
         isl.register(io.github.odlaver.tepi.scene.NotesTab(isl, notes, { newNote() }) { open(Items::class.java, Items.NOTES) })
         isl.register(io.github.odlaver.tepi.scene.ShelfTab(isl, shelf, { picked(it) }) { open(Items::class.java, Items.SHELF) })
         isl.register(io.github.odlaver.tepi.scene.AgentsTab(isl, pc))
+        // Recent captures as a grid, beside the card that announces them
+        isl.register(io.github.odlaver.tepi.scene.ShotsTab(isl, capture) {
+            isl.open(android.content.Intent(android.content.Intent.ACTION_VIEW, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI))
+        })
         isl.home.rows.add(TaskRow(isl, agenda, agendaTab))
         isl.home.rows.add(NoteRow(isl, notes) { open(Items::class.java, Items.NOTES) })
         isl.home.rows.add(ShelfRow(isl, shelf) { picked(it) })
@@ -273,6 +277,20 @@ class Listener : NotificationListenerService() {
             shelf.copy(item)
             alert(Alert("shelf", getString(R.string.copied), item.text!!.take(80), Glyph.Check, ms = 2500))
         } else island?.open(shelf.openIntent(item))
+    }
+
+    // Save to shelf, from the screenshot card. The copy is a file read and a
+    // file write, so it happens off the main thread; the island is told how it
+    // went when it is done, which is also the only feedback the user gets that
+    // the picture is now Tepi's own rather than the gallery's.
+    private fun shelve(shot: Shot) {
+        Thread {
+            val ok = try { shelf.addFile(shot.uri) } catch (_: Exception) { false }
+            android.os.Handler(mainLooper).post {
+                alert(Alert("shelf", getString(if (ok) R.string.shot_shelved else R.string.shot_shelve_failed),
+                    shot.name, if (ok) Glyph.Check else Glyph.Bell, ms = 3000))
+            }
+        }.start()
     }
 
     private fun alert(a: Alert) {
@@ -417,6 +435,12 @@ class Listener : NotificationListenerService() {
         live.posted(sbn)
         if (!own && code == null && pc.linked && pc.online) forward(sbn, rankingMap)
         val isl = island ?: return
+        // Sideways, the notch's eye is the only thing on screen; anything from
+        // another app startles it, whether or not a card would be shown. This
+        // sits above the notifs switch on purpose: the eye is a face reacting,
+        // not the content of the notification, and it says nothing about who
+        // sent what.
+        if (!own) isl.startled()
         if (!prefs.notifs) return
         val n = sbn.notification
         if (sbn.packageName == packageName || sbn.isOngoing || !isMessage(n)) return

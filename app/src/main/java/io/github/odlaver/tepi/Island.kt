@@ -108,6 +108,9 @@ class Island(
     }
     private var attached = false
     private var input: Input? = null
+    // Landscape: a notch on the camera edge instead of nothing at all
+    private var notch: Notch? = null
+    private var notchUp = false
 
     // Geometry, screen px
     private var screenW = 0f
@@ -214,6 +217,9 @@ class Island(
     fun detach() {
         if (!attached) return
         input?.close()
+        notch?.hide()
+        notch = null
+        notchUp = false
         main.removeCallbacksAndMessages(null)
         Choreographer.getInstance().removeFrameCallback(frame)
         ticking = false
@@ -236,9 +242,19 @@ class Island(
         if (level == batteryLevel && charging == batteryCharging) return
         batteryLevel = level
         batteryCharging = charging
+        // The landscape eye goes red on a nearly empty battery, so it is told
+        // whether the island is up or not
+        notch?.battery(level, charging)
         // onDraw reads the level directly; no geometry moved, so a repaint is
         // enough and the frame loop can stay asleep
         if (kind == Kind.Idle) invalidate()
+    }
+
+    // A notification from another app. Nothing is shown for it here: the
+    // message card does that in portrait. It is the landscape eye's cue to
+    // look startled, which is the only thing the notch has to say.
+    fun startled() {
+        notch?.startled()
     }
 
     fun prefsChanged() {
@@ -378,6 +394,36 @@ class Island(
 
     private val landscape get() = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
+    // The landscape notch, put up and taken down as the phone turns.
+    //
+    // It is deliberately not part of choose(): the notch is not a scene and
+    // does not queue behind one. It is up whenever the phone is sideways and
+    // the switch is on, which is the point of it — a game, a video, or a
+    // fullscreen app is exactly when the island itself is gone, and the notch
+    // is what is left to say the phone is still awake.
+    //
+    // The island's own hide switches still apply, because they are the user
+    // saying "not now" rather than Android saying "not here": an hour of quiet
+    // from the menu, and the lock screen when the lock screen is turned off,
+    // put the notch away as well.
+    private fun syncNotch() {
+        val want = landscape && prefs.notchBar &&
+            hiddenUntil <= SystemClock.uptimeMillis() &&
+            !(locked && !prefs.bool("lockscreen", true))
+        if (!want) {
+            if (notchUp) { notch?.hide(); notchUp = false }
+            return
+        }
+        val n = notch ?: Notch(context, screen, type, prefs, ui) {
+            // Tap opens the island's own quick menu, which turns the phone's
+            // whole island on in landscape for as long as it is open
+            main.post { expand(menu) }
+        }.also { notch = it }
+        if (batteryLevel >= 0) n.battery(batteryLevel, batteryCharging)
+        n.show()
+        notchUp = true
+    }
+
     // Widest shape that still keeps the lens in the middle. Clamping width
     // rather than nudging the shape sideways is what keeps every kind centred
     // on the same point, so nothing slides when one replaces another.
@@ -449,6 +495,7 @@ class Island(
     // Recompute target, start motion
     override fun refresh() {
         if (!attached) return
+        syncNotch()
         choose()
         pageList = if (opened != null) pages() else emptyList()
         if (kind != Kind.Panel || opened == null) navOff()
@@ -734,6 +781,7 @@ class Island(
         "menu" -> Icon.Layers
         "github" -> Icon.Github
         "shot" -> Icon.Image
+        "shots" -> Icon.Image
         "volume" -> Icon.Volume
         "flag" -> Icon.Spark
         else -> Icon.Layers
@@ -828,6 +876,8 @@ class Island(
     private var downY = 0f
     private var pressed = false
     private var acted = false
+    // Scene holding the current gesture, set when one claims the touch down
+    private var dragger: Scene? = null
     // A hold inside an open panel goes to what is under the finger first.
     // Home's Wi-Fi and Bluetooth tiles use it for their settings pages, and
     // the quick menu opening on top of them would be the clash, so the menu
@@ -873,9 +923,19 @@ class Island(
                 downY = e.rawY
                 pressed = true
                 acted = false
+                // Something scrubbable under the finger, like the volume
+                // track, takes the whole gesture: no long press, no swipe,
+                // and no tap when it lifts
+                val s = primary
+                if (s != null && (kind == Kind.Compact || kind == Kind.Panel) && s.grab(e.rawX, e.rawY)) {
+                    dragger = s
+                    acted = true
+                    return true
+                }
                 main.postDelayed(longPress, 500)
             }
             MotionEvent.ACTION_MOVE -> {
+                dragger?.let { it.drag(e.rawX, e.rawY); return true }
                 if (!pressed || acted) return true
                 val dx = e.rawX - downX
                 val dy = e.rawY - downY
@@ -888,11 +948,13 @@ class Island(
             }
             MotionEvent.ACTION_UP -> {
                 main.removeCallbacks(longPress)
+                dragger?.let { it.release(); dragger = null; pressed = false; return true }
                 if (pressed && !acted && hypot(e.rawX - downX, e.rawY - downY) < ui.dp(12f)) tap(e.rawX, e.rawY)
                 pressed = false
             }
             MotionEvent.ACTION_CANCEL -> {
                 main.removeCallbacks(longPress)
+                dragger?.let { it.release(); dragger = null }
                 pressed = false
             }
         }

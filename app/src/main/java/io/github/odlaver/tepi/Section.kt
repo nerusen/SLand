@@ -53,6 +53,19 @@ class Section : Page() {
         val need = Radios.missing(this)
         row(g, getString(R.string.radio_names), getString(if (need.isEmpty()) R.string.radio_names_on else R.string.radio_names_sub),
             if (need.isEmpty()) null else button(getString(R.string.grant)) { requestPermissions(need, REQ_RADIOS) }, Icon.Wifi)
+        // Sideways the island has nowhere to be, so it becomes a notch with
+        // one eye in it instead of disappearing
+        label(getString(R.string.notch))
+        val n = group()
+        toggle(n, getString(R.string.notch_bar), getString(R.string.notch_bar_sub), prefs.notchBar, icon = Icon.Eye) {
+            prefs.notchBar = it; changed(); rebuild()
+        }
+        if (prefs.notchBar) {
+            toggle(n, getString(R.string.notch_tap), getString(if (prefs.notchOpens) R.string.notch_tap_on else R.string.notch_tap_off), prefs.notchOpens, icon = Icon.Hand) {
+                prefs.notchOpens = it; changed(); rebuild()
+            }
+            note(getString(R.string.notch_note))
+        }
                 label(getString(R.string.gestures))
         val h = group()
         for ((t, d, i) in listOf(
@@ -95,6 +108,10 @@ class Section : Page() {
         val shotOk = Capture.allowed(this)
         toggle(sh, getString(R.string.act_shot), getString(if (shotOk) R.string.act_shot_sub else R.string.act_shot_need),
             prefs.bool(Capture.KEY, true) && shotOk, shotOk, Icon.Image) { prefs.set(Capture.KEY, it); restartCapture() }
+        // The grid is a separate want from the card: one arrives, the other is
+        // gone looking for
+        toggle(sh, getString(R.string.act_shots_tab), getString(if (shotOk) R.string.act_shots_tab_sub else R.string.act_shot_need),
+            prefs.bool(Capture.TAB_KEY, true) && shotOk, shotOk, Icon.Layers) { prefs.set(Capture.TAB_KEY, it); changed() }
         if (!shotOk) row(sh, getString(R.string.act_shot_perm), getString(R.string.act_shot_perm_sub),
             button(getString(R.string.grant)) { requestPermissions(arrayOf(Capture.permission()), REQ_SHOT) }, Icon.Image)
 
@@ -344,8 +361,10 @@ class Section : Page() {
                 rebuild()
             }
             REQ_SHOT -> {
-                // The watcher only registers when the read is allowed
+                // The watcher only registers when the read is allowed, and
+                // the grid tab only lists itself once it is
                 Listener.instance?.let { it.capture.stop(); it.capture.start() }
+                changed()
                 rebuild()
             }
         }
