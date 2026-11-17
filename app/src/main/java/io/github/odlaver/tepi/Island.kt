@@ -105,9 +105,14 @@ class Island(
     private val pill = RectF()
     private var statusBottom = 0f
     private var wingBase = 0f
-    private val l = Spring(0f, 0.3f)
+    // Centre and width, not two edges. Two edge springs only hold the centre
+    // still while their targets are symmetric and their velocities match; a
+    // retarget mid-flight, or a target nudged sideways to clear a screen edge,
+    // leaves the pair out of step and the shape visibly slides across as it
+    // opens or closes. One centre spring cannot drift.
+    private val midX = Spring(0f, 0.3f)
+    private val wid = Spring(0f, 0.3f)
     private val t = Spring(0f, 0.3f)
-    private val r = Spring(0f, 0.3f)
     private val b = Spring(0f, 0.3f)
     private val rad = Spring(0f, 0.3f)
     private val neck = Spring(0f, 0.3f)
@@ -117,6 +122,11 @@ class Island(
     private val contentA = Spring(0f, 0.004f, 520f, 46f)
     // Logo and battery fade with the resting capsule, apart from scene content
     private val idleA = Spring(0f, 0.004f, 520f, 46f)
+    // Tab bar: drives both its own fade and the panel's extra height. It is
+    // given the same constants as the bottom edge so the two move in lockstep;
+    // a stiffer or softer spring here would let the bar drift away from the
+    // edge it is supposed to be riding.
+    private val navA = Spring(0f, 0.004f, 380f, 32f)
     private val now = RectF()
     private val target = RectF()
     private val bubble = RectF()
@@ -135,6 +145,15 @@ class Island(
     private var lastTouch = 0L
     private var batteryLevel = -1
     private var batteryCharging = false
+    private var navShown = false
+    private var navHideAt = 0L
+    private var navCell = 0f
+    private val dotsHit = RectF()
+    private val navBar = RectF()
+    // The page list is wanted several times per frame, by the panel's height
+    // as well as its dots and tab bar; rebuilding it each time would allocate
+    // on every frame, so refresh settles it once
+    private var pageList: List<Scene> = emptyList()
 
     private val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private val shape = Path()
@@ -158,7 +177,7 @@ class Island(
     fun attach() {
         if (attached) return
         measureScreen()
-        l.snap(hole.left); t.snap(hole.top); r.snap(hole.right); b.snap(hole.bottom); rad.snap(hole.height() / 2)
+        midX.snap(hole.centerX()); wid.snap(hole.width()); t.snap(hole.top); b.snap(hole.bottom); rad.snap(hole.height() / 2)
         neck.snap(hole.width()); split.snap(hole.top); radB.snap(hole.height() / 2)
         place(hole, false)
         wm.addView(this, lp)
@@ -345,7 +364,12 @@ class Island(
     }
 
     private val landscape get() = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    private val wide get() = min(screenW - ui.edge * 2, ui.panelMax)
+
+    // Widest shape that still keeps the lens in the middle. Clamping width
+    // rather than nudging the shape sideways is what keeps every kind centred
+    // on the same point, so nothing slides when one replaces another.
+    private val span get() = max(pill.width(), 2 * min(hole.centerX() - ui.edge, screenW - ui.edge - hole.centerX()))
+    private val wide get() = min(min(screenW - ui.edge * 2, ui.panelMax), span)
 
     private fun choose() {
         val o = opened
@@ -380,51 +404,88 @@ class Island(
 
     private fun compactWidth(s: Scene?) = pill.width() + max(s?.wing() ?: 0f, wingBase) * 2
 
+    // Page dots, shown whenever the open panel has somewhere to swipe to
+    private fun dotsH() = if (opened != null && pageList.size > 1) ui.dp(18f) else 0f
+
+    // Room the tab bar asks for. The panel's bottom edge is a spring, so
+    // turning this on or off is the whole height animation: the bar is drawn
+    // at a fixed place against the resting edge, and the moving edge uncovers
+    // it on the way down and covers it again on the way back up.
+    private fun navExtra() = if (navShown && kind == Kind.Panel && opened != null && pageList.size > 1) ui.dp(NAV_H) + ui.s8 else 0f
+
+    // Shown on a page change or a tap on the dots, then it steps back out
+    private fun navOn() {
+        navShown = true
+        navHideAt = SystemClock.uptimeMillis() + NAV_MS
+        main.removeCallbacks(hideNav)
+        main.postDelayed(hideNav, NAV_MS)
+    }
+
+    private fun navOff() {
+        if (!navShown) return
+        navShown = false
+        navBar.setEmpty()
+        main.removeCallbacks(hideNav)
+    }
+
+    private val hideNav = Runnable {
+        if (navShown && SystemClock.uptimeMillis() >= navHideAt - 100) { navOff(); refresh() }
+    }
+
     // Recompute target, start motion
     override fun refresh() {
         if (!attached) return
         choose()
+        pageList = if (opened != null) pages() else emptyList()
+        if (kind != Kind.Panel || opened == null) navOff()
+        // Both strips are positioned by drawTabs, which only runs for an open
+        // panel with pages. Clearing them here stops a stale rectangle from a
+        // previous panel taking taps meant for the scene.
+        if (pageList.size < 2) { dotsHit.setEmpty(); navBar.setEmpty() }
         val cx = hole.centerX()
         var nk: Float
         var sy: Float
         var rt = pill.height() / 2
         var rb = rt
+        // Every kind is laid out as a width around the lens, so the centre
+        // never moves between them
+        var w: Float
+        var top = pill.top
+        var bottom: Float
         when (kind) {
             Kind.Hidden -> {
-                target.set(hole); nk = hole.width(); sy = hole.top; rt = hole.height() / 2; rb = rt
+                w = hole.width(); top = hole.top; bottom = hole.bottom
+                nk = hole.width(); sy = hole.top; rt = hole.height() / 2; rb = rt
             }
             Kind.Idle -> {
-                val w = idleWidth()
-                target.set(cx - w / 2, pill.top, cx + w / 2, pill.bottom)
+                w = idleWidth(); bottom = pill.bottom
                 nk = w; sy = pill.top
             }
             Kind.Compact -> {
-                val w = compactWidth(primary)
+                val pillW = compactWidth(primary)
                 val row = primary?.rowWidth() ?: 0f
                 if (row > 0f) {
-                    val bw = row.coerceIn(w, wide)
-                    target.set(cx - bw / 2, pill.top, cx + bw / 2, statusBottom + ui.dp(32f))
-                    nk = w; sy = statusBottom; rb = ui.dp(18f)
+                    w = row.coerceIn(min(pillW, wide), wide)
+                    bottom = statusBottom + ui.dp(32f)
+                    nk = pillW; sy = statusBottom; rb = ui.dp(18f)
                 } else {
-                    target.set(cx - w / 2, pill.top, cx + w / 2, pill.bottom)
+                    w = min(pillW, wide); bottom = pill.bottom
                     nk = w; sy = pill.top
                 }
             }
             Kind.Panel -> {
-                val w = wide
+                w = wide
                 val h = primary?.panelHeight(w - ui.pad * 2) ?: 0f
-                val dots = if (opened != null && pages().size > 1) ui.dp(18f) else 0f
-                target.set(cx - w / 2, pill.top, cx + w / 2, statusBottom + ui.s16 + h + ui.pad + dots)
+                bottom = statusBottom + ui.s16 + h + ui.pad + dotsH() + navExtra()
                 nk = min(compactWidth(if (primary?.card() == true) null else primary), w)
                 sy = statusBottom; rb = ui.radiusPanel
             }
         }
-        // Keep clear of the screen edges
-        val m = ui.edge
-        if (target.left < m) target.offset(m - target.left, 0f)
-        if (target.right > screenW - m) target.offset(screenW - m - target.right, 0f)
+        // Clamping the width keeps the shape centred; offsetting it would not
+        w = w.coerceIn(0f, span)
+        target.set(cx - w / 2, top, cx + w / 2, bottom)
 
-        l.target = target.left; t.target = target.top; r.target = target.right; b.target = target.bottom
+        midX.target = cx; wid.target = w; t.target = target.top; b.target = target.bottom
         neck.target = nk; split.target = sy; rad.target = rt; radB.target = rb
         bubbleK.target = if (second != null) 1f else 0f
         val d = pill.height()
@@ -433,11 +494,12 @@ class Island(
         wantedKey = "$kind:${primary?.id}"
         if (wantedKey != shownKey) contentA.target = 0f
         idleA.target = if (kind == Kind.Idle) 1f else 0f
+        navA.target = if (navShown && kind == Kind.Panel && pageList.size > 1) 1f else 0f
         contentDescription = primary?.describe()
 
         // Grow first; shrink once settled
         val union = RectF(target)
-        union.union(l.value, t.value, r.value, b.value)
+        union.union(midX.value - wid.value / 2, t.value, midX.value + wid.value / 2, b.value)
         if (second != null || bubbleK.value > 0.01f) union.union(bubble)
         place(union, wantsTouch())
         kick()
@@ -484,9 +546,10 @@ class Island(
         val dt = if (lastNs == 0L) 1f / 60f else ((ns - lastNs) / 1e9f).coerceIn(0f, 1f / 20f)
         lastNs = ns
         var moving = false
-        for (s in arrayOf(l, t, r, b, rad, neck, split, radB, bubbleK)) moving = s.step(dt) or moving
+        for (s in arrayOf(midX, wid, t, b, rad, neck, split, radB, bubbleK)) moving = s.step(dt) or moving
         moving = contentA.step(dt) or moving
         moving = idleA.step(dt) or moving
+        moving = navA.step(dt) or moving
         if (contentA.value <= 0.05f && contentA.target == 0f) {
             shownKey = wantedKey
             shownScene = primary
@@ -522,7 +585,8 @@ class Island(
     }
 
     override fun onDraw(canvas: Canvas) {
-        now.set(l.value, t.value, r.value, b.value)
+        val half = max(0f, wid.value) / 2
+        now.set(midX.value - half, t.value, midX.value + half, b.value)
         if (kind == Kind.Hidden && shownKind == Kind.Hidden && !ticking) return
         getLocationOnScreen(loc)
         canvas.save()
@@ -545,24 +609,18 @@ class Island(
                 }
             }
             Kind.Panel -> {
-                val list = if (opened != null) pages() else emptyList()
-                val dots = if (list.size > 1) ui.dp(18f) else 0f
-                content.set(target.left + ui.pad, statusBottom + ui.s16, target.right - ui.pad, target.bottom - ui.pad - dots)
+                content.set(target.left + ui.pad, statusBottom + ui.s16, target.right - ui.pad, target.bottom - ui.pad - dotsH() - navExtra())
                 s.drawPanel(canvas, content, a)
-                // Page dots: which tab, and that there are more
-                if (list.size > 1) {
-                    val r = ui.dp(3f)
-                    val gap = ui.dp(10f)
-                    val y = target.bottom - ui.pad / 2 - dots / 2
-                    var x = target.centerX() - (list.size - 1) * gap / 2
-                    for (p in list) {
-                        ui.dot(canvas, x, y, r, if (p === s) ui.ink else ui.faint, a)
-                        x += gap
-                    }
-                }
             }
             Kind.Hidden, Kind.Idle -> Unit
         }
+        // Panel chrome rides the shape, not the content crossfade. A page
+        // change dips contentA to zero and back; blinking the dots and the tab
+        // bar in time with it would be the very flicker the bar exists to
+        // replace. The clip keeps them inside the shape, so a half-grown panel
+        // still cannot leak them.
+        if (kind == Kind.Panel && opened != null && pageList.size > 1) drawTabs(canvas, pageList)
+        else { dotsHit.setEmpty(); navBar.setEmpty() }
         val sec = second
         if (k > 0.05f && sec != null && shownKind == Kind.Compact) {
             box.set(bubble)
@@ -573,6 +631,94 @@ class Island(
         val ia = idleA.value.coerceIn(0f, 1f)
         if (ia > 0.01f) drawIdleChrome(canvas, ia)
         canvas.restore()
+    }
+
+    // Page dots, and under them the tab bar. Both are placed against the
+    // panel's resting edge, not the animated one, so turning the bar on leaves
+    // the dots exactly where they were: the only things that move are the
+    // island's bottom edge and the bar it uncovers. The canvas is clipped to
+    // the shape, so the bar is revealed as the edge sweeps past it and covered
+    // again as it comes back, which is the slide the height change is for.
+    // Marks follow the page that is actually open, not the one fading out, so
+    // the highlight lands with the swipe.
+    private fun drawTabs(c: Canvas, list: List<Scene>) {
+        val dots = ui.dp(18f)
+        val navH = ui.dp(NAV_H)
+        val cy = target.bottom - navExtra() - ui.pad / 2 - dots / 2
+        val gap = ui.dp(10f)
+        var x = target.centerX() - (list.size - 1) * gap / 2
+        for (p in list) {
+            ui.dot(c, x, cy, ui.dp(3f), if (p === primary) ui.ink else ui.faint, 1f)
+            x += gap
+        }
+        // Tapping the dots is the other way in, so the strip takes touches
+        // whether the bar is up or not
+        dotsHit.set(target.left, cy - dots / 2 - ui.s4, target.right, cy + dots / 2 + ui.s4)
+
+        val k = navA.value.coerceIn(0f, 1f)
+        if (k <= 0.01f) { navBar.setEmpty(); return }
+        // Settings is personal, so the lock screen gets the pages only
+        val gear = !locked
+        val n = list.size + if (gear) 1 else 0
+        navCell = min(ui.dp(40f), (target.width() - ui.pad * 2) / n)
+        val barW = navCell * n
+        val top = cy + dots / 2 + ui.s8
+        navBar.set(target.centerX() - barW / 2, top, target.centerX() + barW / 2, top + navH)
+        ui.fill(c, navBar, navH / 2, ui.tray, k)
+        var cx = navBar.left + navCell / 2
+        for (p in list) {
+            ui.icon(c, tabIcon(p), cx, navBar.centerY(), ui.dp(18f), if (p === primary) ui.ink else ui.faint, k)
+            cx += navCell
+        }
+        if (gear) ui.icon(c, Icon.Gear, cx, navBar.centerY(), ui.dp(18f), ui.faint, k)
+        // Half-uncovered icons are not worth aiming at; the strip takes taps
+        // once it is mostly out
+        if (k < 0.4f) navBar.setEmpty()
+    }
+
+    // Which icon a point in the tab bar lands on. The cells are even, so this
+    // is arithmetic rather than a list of rectangles rebuilt every frame.
+    private fun navTap(x: Float, y: Float): Boolean {
+        if (!navShown || navBar.isEmpty || !navBar.contains(x, y) || navCell <= 0f) return false
+        val list = pageList
+        val last = list.size + if (locked) -1 else 0
+        val i = ((x - navBar.left) / navCell).toInt().coerceIn(0, max(0, last))
+        haptic()
+        navOn()
+        if (i < list.size) {
+            if (list[i] !== primary) expand(list[i])
+        } else {
+            open(Intent(context, MainActivity::class.java))
+            collapse()
+        }
+        return true
+    }
+
+    // One mark per page, matching the icon the page itself heads with. Live
+    // scenes join the pages while they last, so they are listed here too
+    // rather than falling back to a generic mark.
+    private fun tabIcon(s: Scene) = when (s.id) {
+        "home" -> Icon.Home
+        "music" -> Icon.Music
+        "timer" -> Icon.Timer
+        "agenda" -> Icon.Book
+        "prayer" -> Icon.Moon
+        "agents" -> Icon.Laptop
+        "notes" -> Icon.Note
+        "shelf" -> Icon.Shelf
+        "tasks" -> Icon.Tasks
+        "incoming", "call" -> Icon.Phone
+        "nav" -> Icon.Nav
+        "clock" -> Icon.Timer
+        "progress" -> Icon.Download
+        "message" -> Icon.Chat
+        "translate" -> Icon.Globe
+        "brief" -> Icon.Spark
+        "privacy" -> Icon.Shield
+        "agent" -> Icon.Laptop
+        "alert" -> Icon.Bell
+        "menu" -> Icon.Layers
+        else -> Icon.Layers
     }
 
     // Logo hard left, battery hard right, both inside the capsule with the
@@ -754,6 +900,9 @@ class Island(
         val next = cur + dir
         if (next < 0 || next >= list.size) return
         haptic()
+        // Changing page is the cue to show the tab bar, so the next hop can be
+        // a tap rather than another swipe
+        navOn()
         expand(list[next])
     }
 
@@ -768,7 +917,19 @@ class Island(
             Kind.Panel -> {
                 // Neck around the camera toggles closed
                 if (y < statusBottom) { if (opened != null) collapse() else primary?.dismiss() }
-                else { armClose(); primary?.tap(x, y) }
+                else {
+                    armClose()
+                    when {
+                        navTap(x, y) -> Unit
+                        // The dots are the handle for the bar: tap to call it
+                        // up, tap again to put it away
+                        dotsHit.contains(x, y) && pageList.size > 1 -> {
+                            haptic()
+                            if (navShown) navOff() else navOn()
+                        }
+                        else -> primary?.tap(x, y)
+                    }
+                }
             }
         }
         refresh()
@@ -776,6 +937,9 @@ class Island(
 
     companion object {
         private const val CLOSE_MS = 9000L
+        // Tab bar: how tall, and how long it stays up after the last nudge
+        private const val NAV_H = 36f
+        private const val NAV_MS = 4500L
         const val URGENT = 95
     }
 }

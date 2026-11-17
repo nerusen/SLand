@@ -48,6 +48,10 @@ class Ui(context: Context) {
     val fill = Color.argb(28, 255, 255, 255)
     val fillStrong = Color.argb(46, 255, 255, 255)
     val line = Color.argb(23, 255, 255, 255)
+    // Opaque dark grey, a step up from the island's black. The tab bar sits on
+    // the island itself, so a translucent white would read as a smudge against
+    // whatever is behind the overlay; this is a flat tone instead.
+    val tray = Color.rgb(34, 34, 36)
 
     val title = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = ink; textSize = sp(14f); typeface = Typeface.DEFAULT_BOLD }
     val body = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = sub; textSize = sp(12f) }

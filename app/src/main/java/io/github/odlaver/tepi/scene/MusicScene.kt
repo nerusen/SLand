@@ -102,12 +102,23 @@ class MusicScene(host: Host, private val media: Media, private val prefs: Prefs,
         return s.lines[lyricIdx].text.takeIf { it.isNotEmpty() }
     }
 
+    // What the compact lyric bar shows. Once the first line has played the bar
+    // stays up for the rest of the song, carrying a note through instrumental
+    // gaps: letting it close and reopen between verses would shrink and regrow
+    // the island each time, which is worse than an empty bar.
+    private fun rowLine(): String? {
+        if (!prefs.lyrics) return null
+        val s = song ?: return null
+        if (s.lines.isEmpty() || lyricIdx < 0) return null
+        return currentLine() ?: "♪"
+    }
+
     private fun updateLyric(): Boolean {
         val s = song ?: return false
         if (s.lines.isEmpty()) return false
         val idx = s.indexAt(media.positionMs() + 150)
         if (idx == lyricIdx) return false
-        lyricPrev = currentLine() ?: ""
+        lyricPrev = rowLine() ?: ""
         lyricIdx = idx
         lyricT.snap(0f)
         lyricT.target = 1f
@@ -122,13 +133,28 @@ class MusicScene(host: Host, private val media: Media, private val prefs: Prefs,
         bars(c, right.right - s / 2, right.centerY(), s * 0.8f, a)
     }
 
+    // One width for the whole song, not one per line. The island sizes the
+    // lyric bar from this, so measuring the current line would resize the
+    // shape on every line change: exactly where the eye is resting. Measured
+    // once when the song's lines arrive, then held.
+    private var rowW = 0f
+    private var rowWKey: String? = null
+
     override fun rowWidth(): Float {
-        val line = currentLine() ?: return 0f
-        return ui.lyric.measureText(line) + ui.dp(40f)
+        val s = song
+        if (s == null || !prefs.lyrics || s.lines.isEmpty()) return 0f
+        if (rowLine() == null) return 0f
+        if (rowWKey != s.key) {
+            var widest = 0f
+            for (ln in s.lines) if (ln.text.isNotEmpty()) widest = maxOf(widest, ui.lyric.measureText(ln.text))
+            rowW = widest + ui.dp(40f)
+            rowWKey = s.key
+        }
+        return rowW
     }
 
     override fun drawRow(c: Canvas, r: RectF, a: Float) {
-        val line = currentLine() ?: return
+        val line = rowLine() ?: return
         val k = lyricT.value.coerceIn(0f, 1f)
         val shift = ui.dp(10f)
         val w = r.width() - ui.s24
