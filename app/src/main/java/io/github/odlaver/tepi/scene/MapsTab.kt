@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.graphics.RectF
 import android.os.SystemClock
 import io.github.odlaver.tepi.Icon
+import io.github.odlaver.tepi.MapFault
 import io.github.odlaver.tepi.Maps
 import io.github.odlaver.tepi.Prefs
 import io.github.odlaver.tepi.R
@@ -108,13 +109,41 @@ class MapsTab(
         cell.set(r.left, y, r.right, y + ui.dp(STAT_H))
         drawStats(c, cell, a)
         y = cell.bottom + ui.s12
+        // The second button depends on what is wrong. A key problem is the one
+        // thing on this page a user cannot fix from inside the app — it is a
+        // build setting or a dashboard setting — so the button goes to CARTO's
+        // own key page where the explanation is, rather than to Tepi's
+        // settings where there is nothing to change.
+        val keyTrouble = maps.fault == MapFault.NoKey || maps.fault == MapFault.Refused
+        val second = if (keyTrouble)
+            Action(host.ctx.getString(R.string.maps_key_page), false, Icon.Info) {
+                host.open(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(Maps.KEY_PAGE)))
+                host.collapse()
+            }
+        else Action(host.ctx.getString(R.string.maps_body), false, Icon.Gear) { settings(); host.collapse() }
         actions(c, r, y, listOf(
             Action(host.ctx.getString(R.string.maps_open), true, Icon.Nav) { host.open(openHere()); host.collapse() },
-            Action(host.ctx.getString(R.string.maps_body), false, Icon.Gear) { settings(); host.collapse() },
+            second,
         ), a)
     }
 
-    // The position, handed to whatever map app the phone has.
+    // Why the basemap is not there, in two lines inside the empty frame.
+    //
+    // The walking figures underneath are unaffected by any of this — they come
+    // from the phone's own sensor — so this says what is missing and leaves
+    // the rest of the page working, rather than taking the whole tab down for
+    // a tile server.
+    private fun faultText(c: Canvas, at: RectF, fault: MapFault, a: Float) {
+        val (title, body) = when (fault) {
+            MapFault.NoKey -> R.string.maps_nokey to R.string.maps_nokey_sub
+            MapFault.Refused -> R.string.maps_refused to R.string.maps_refused_sub
+            else -> R.string.maps_offline to R.string.maps_offline_sub
+        }
+        val w = at.width() - ui.s24
+        ui.centered(c, host.ctx.getString(title), ui.label, at.centerX(), at.centerY() - ui.dp(9f), w, a)
+        ui.centered(c, host.ctx.getString(body), ui.body, at.centerX(), at.centerY() + ui.dp(9f), w, a)
+    }
+
     //
     // A geo: URI with a q of the same coordinates, not just the coordinates.
     // geo:lat,lon alone centres the map there and marks nothing, which looks
@@ -142,6 +171,13 @@ class MapsTab(
     // side to cover the frame. Missing tiles are simply not drawn — the ground
     // under them is the island's own fill, so a map still loading reads as a
     // map loading rather than as a hole.
+    //
+    // A basemap that cannot be fetched at all is said in words instead. The
+    // tiles are a third-party service with a key on it, and the three ways
+    // that fails have three different answers: no key compiled in, a key the
+    // service will not serve to this app, and no network. A grey rectangle
+    // answers none of them, and CARTO's own "API KEY REQUIRED" tile is worse —
+    // it is a valid image, so it would be drawn as though it were a map.
     private fun drawMap(c: Canvas, at: RectF, a: Float) {
         val radius = ui.dp(12f)
         ui.fill(c, at, radius, ui.fill, a)
@@ -170,12 +206,22 @@ class MapsTab(
         // the panel's own shape
         tmp.set(at)
         clip(c, tmp, radius)
+        var drawn = 0
         for (dx in -left..right) for (dy in -up..down) {
             val tx = Maps.floorInt(cx) + dx
             val ty = Maps.floorInt(cy) + dy
             val bmp = maps.tile(zoom, tx, ty) { host.refresh() } ?: continue
             cell.set(originX + dx * side, originY + dy * side, originX + (dx + 1) * side, originY + (dy + 1) * side)
             ui.image(c, bmp, cell, a)
+            drawn++
+        }
+        // Nothing arrived and the fetcher knows why: say so rather than
+        // leaving the dot floating on an empty panel
+        val fault = maps.fault
+        if (drawn == 0 && fault != MapFault.None) {
+            c.restore()
+            faultText(c, at, fault, a)
+            return
         }
         // The dot: a white ring round a coloured core, which is how a position
         // marker stays visible over both a pale street and a dark park

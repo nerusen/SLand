@@ -25,6 +25,26 @@ android {
         // Where Check for updates and Source code point; must match the
         // GitHub repo that publishes the releases
         buildConfigField("String", "REPO", "\"nerusen/SLand\"")
+
+        // The CARTO Basemaps key for the Maps tab.
+        //
+        // From a Gradle property, never from a file in the repo: locally it
+        // goes in ~/.gradle/gradle.properties beside the signing passwords,
+        // and in CI the workflow passes it from a repository secret. An empty
+        // string is a valid build — the Maps tab then says the key is missing
+        // and points at the settings page, rather than drawing CARTO's
+        // "API KEY REQUIRED" tiles, which is what an absent key actually
+        // returns since 25 September 2026.
+        //
+        // The key is compiled into the APK and anyone can read it back out of
+        // the file. That is expected and is why CARTO's dashboard takes a
+        // package name and a signing certificate fingerprint: a key restricted
+        // to com.nelsencreative.sland and this project's release certificate
+        // is useless to anybody who extracts it, because their build cannot
+        // present the matching signature. Restricting the key is therefore not
+        // optional here — it is the thing that makes shipping it safe.
+        val cartoKey = providers.gradleProperty("CARTO_KEY").orNull ?: ""
+        buildConfigField("String", "CARTO_KEY", "\"$cartoKey\"")
     }
 
     // Signing key lives outside the repo: in ~/.gradle/gradle.properties

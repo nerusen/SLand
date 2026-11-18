@@ -58,8 +58,19 @@ jobs:
           STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          # The Maps tab's basemap key. CARTO has required one on every tile
+          # request since 25 September 2026; without it the service answers
+          # with an "API KEY REQUIRED" placeholder rather than a map. It is
+          # compiled into the APK, which is safe only because the key is
+          # restricted in CARTO's dashboard to this package name and this
+          # signing certificate — so a build made with a different key, or by
+          # someone who extracted this one, cannot use it.
+          CARTO_KEY: ${{ secrets.CARTO_KEY }}
         run: |
           set -e
+          if [ -z "$CARTO_KEY" ]; then
+            echo "::warning::No CARTO_KEY secret. The Maps tab will say the basemap key is missing."
+          fi
           if [ "$KEYSTORE_PRESENT" = "true" ]; then
             variants="debug release"
             tasks="assembleDebug assembleRelease"
@@ -67,12 +78,13 @@ jobs:
               "-PSLAND_STORE=$RUNNER_TEMP/sland.jks" \
               "-PSLAND_STORE_PASSWORD=$STORE_PASSWORD" \
               "-PSLAND_KEY_ALIAS=${KEY_ALIAS:-sland}" \
-              "-PSLAND_KEY_PASSWORD=${KEY_PASSWORD:-$STORE_PASSWORD}"
+              "-PSLAND_KEY_PASSWORD=${KEY_PASSWORD:-$STORE_PASSWORD}" \
+              "-PCARTO_KEY=$CARTO_KEY"
           else
             echo "::notice::No KEYSTORE_BASE64 secret. Building debug only, with the Android debug key."
             variants="debug"
             tasks="assembleDebug"
-            set --
+            set -- "-PCARTO_KEY=$CARTO_KEY"
           fi
           ./gradlew --no-daemon $tasks "$@"
           echo "variants=$variants" >> "$GITHUB_OUTPUT"

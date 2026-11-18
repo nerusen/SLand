@@ -287,6 +287,15 @@ class Section : Page() {
         // Where the phone is, and how far it has walked today
         label(getString(R.string.tab_maps))
         val w = group()
+        // The basemap's own key. Not a setting — it is compiled in from a
+        // build property, so there is nothing to type here — but it is worth a
+        // row, because "the map is blank" and "the key is missing" look
+        // identical from the outside and only this row tells them apart.
+        val mapKey = BuildConfig.CARTO_KEY.isNotBlank()
+        row(w, getString(R.string.maps_key), getString(if (mapKey) R.string.maps_key_on else R.string.maps_key_off),
+            if (mapKey) null else button(getString(R.string.maps_key_page), false) {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Maps.KEY_PAGE)))
+            }, Icon.Pin)
         val walkOk = Listener.instance?.steps?.canCount() ?: false
         val hasSensor = Listener.instance?.steps?.hasCounter() ?: false
         toggle(w, getString(R.string.act_walk), getString(R.string.act_walk_sub), prefs.steps, icon = Icon.Stretch) {

@@ -122,10 +122,12 @@ class Ui(context: Context, private val prefs: Prefs? = null) {
         adopt(t)
     }
 
-    // Deliberately not called apply(). A member named apply shadows Kotlin's
-    // own scope function for every call inside this class, and this class is
-    // built almost entirely out of `Paint(...).apply { }` — the paints above
-    // would stop compiling, and not at this line.
+    // Named adopt rather than apply. A member named apply does not in fact
+    // shadow Kotlin's scope function for `Paint(...).apply { }` — that call
+    // has an explicit receiver, so resolution looks at members of Paint and
+    // then at extensions, and a member of Ui is neither. The name is still
+    // avoided here because this class is built almost entirely out of those
+    // calls and a reader should not have to work that out to be sure.
     private fun adopt(t: Theme) {
         theme = t
         back = t.back

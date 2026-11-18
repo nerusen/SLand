@@ -107,7 +107,7 @@ class Listener : NotificationListenerService() {
         // Walking: the step counter all day, and GPS only while the map is up
         steps = Steps(this, prefs) { island?.refresh() }
         shortcuts = Shortcuts(this, prefs)
-        maps = Maps(cacheDir)
+        maps = Maps(this, cacheDir)
         // The screen turned most of the way up, which is almost always the
         // slider left where daylight put it
         glare = Glare(this, prefs) { pct -> tooBright(pct) }

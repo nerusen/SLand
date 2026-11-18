@@ -551,9 +551,23 @@
     <string name="body_height">Height</string>
     <string name="body_weight">Weight</string>
 
-    <string name="reads_maps">Your position, while the Maps page is open and only then. It picks which map squares to draw and is never stored or sent anywhere. The squares themselves are fetched from CARTO\'s map service, which sees the request for a square of the world and nothing else — not who asked, and not where you are, because a square is about a kilometre across and millions of people live in each one.</string>
+    <string name="reads_maps">Your position, while the Maps page is open and only then. It picks which map squares to draw, and it is never stored and never sent anywhere. The squares themselves are fetched from CARTO\'s map service, which since September 2026 requires an identifying key on every request. So CARTO sees which squares of the world this app asked for, the key, and the usual things any web request carries such as your IP address. A square is about a kilometre across and millions of people live in each one, so a square is not your address — but the request is no longer anonymous, and saying it is would be wrong. Map squares are cached on the phone for up to thirty days, which is the longest CARTO\'s terms allow, and then re-fetched.</string>
     <string name="reads_steps">The phone\'s own step counter, which counts in a low-power chip and never leaves the phone. Your height and weight, which you type in yourself, are stored on the phone and used only to work out the distance and the energy figure.</string>
     <string name="reads_pins">The list of apps installed on the phone, to show you which ones you can pin. Only the ones you pick are remembered, as package names.</string>
     <string name="reads_glare">The screen brightness setting, read to notice when it is most of the way up. Nothing is written: the warning only tells you, and the button takes you to the system\'s own page.</string>
     <string name="reads_badge">Whatever the capsule mark you picked shows: the clock, the memory in use, the carrier\'s name, or the Wi-Fi and Bluetooth names. All of it is read from the phone and drawn on screen, and none of it is stored or sent.</string>
+
+    <!-- When the basemap will not load, and why -->
+    <string name="maps_nokey">Basemap key missing</string>
+    <string name="maps_nokey_sub">This build has no CARTO key compiled in.</string>
+    <string name="maps_refused">Basemap key refused</string>
+    <string name="maps_refused_sub">The key is not allowed to serve this app.</string>
+    <string name="maps_offline">Basemap unavailable</string>
+    <string name="maps_offline_sub">No connection, or the tile service is down.</string>
+    <string name="maps_key_page">About keys</string>
+
+    <!-- The basemap key's state, shown rather than edited -->
+    <string name="maps_key">Basemap key</string>
+    <string name="maps_key_on">Present. The map draws from CARTO, which has required a key on every tile since September 2026.</string>
+    <string name="maps_key_off">Missing from this build, so the map cannot draw. The walking figures still work: they come from the phone\'s own step counter.</string>
 </resources>

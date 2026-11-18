@@ -548,9 +548,23 @@
     <string name="body_height">Tinggi badan</string>
     <string name="body_weight">Berat badan</string>
 
-    <string name="reads_maps">Posisi Anda, hanya selama halaman Maps terbuka. Posisi dipakai untuk memilih petak peta yang digambar, dan tidak pernah disimpan atau dikirim ke mana pun. Petaknya sendiri diambil dari layanan peta CARTO, yang hanya melihat permintaan satu petak dunia dan tidak lebih — bukan siapa yang meminta, dan bukan di mana Anda berada, karena satu petak lebarnya sekitar satu kilometer dan jutaan orang tinggal di dalamnya.</string>
+    <string name="reads_maps">Posisi Anda, hanya selama halaman Maps terbuka. Posisi dipakai untuk memilih petak peta yang digambar, tidak pernah disimpan dan tidak pernah dikirim ke mana pun. Petaknya sendiri diambil dari layanan peta CARTO, yang sejak September 2026 mewajibkan kunci pengenal pada setiap permintaan. Jadi CARTO melihat petak dunia mana yang diminta aplikasi ini, kuncinya, serta hal-hal biasa yang dibawa permintaan web seperti alamat IP Anda. Satu petak lebarnya sekitar satu kilometer dan jutaan orang tinggal di dalamnya, jadi satu petak bukanlah alamat Anda — tetapi permintaannya tidak lagi anonim, dan mengatakan sebaliknya tidak benar. Petak peta disimpan di ponsel maksimal tiga puluh hari, batas terlama yang diizinkan ketentuan CARTO, lalu diambil ulang.</string>
     <string name="reads_steps">Penghitung langkah milik ponsel, yang menghitung di chip hemat daya dan tidak pernah keluar dari ponsel. Tinggi dan berat badan yang Anda isi sendiri disimpan di ponsel dan hanya dipakai untuk menghitung jarak serta angka energi.</string>
     <string name="reads_pins">Daftar aplikasi yang terpasang di ponsel, untuk menunjukkan mana saja yang bisa ditempel. Hanya yang Anda pilih yang diingat, berupa nama paket.</string>
     <string name="reads_glare">Pengaturan kecerahan layar, dibaca untuk mengetahui kapan kecerahan hampir penuh. Tidak ada yang ditulis: peringatan hanya memberi tahu, dan tombolnya membawa Anda ke halaman pengaturan sistem.</string>
     <string name="reads_badge">Apa pun yang ditampilkan tanda capsule pilihan Anda: jam, memori terpakai, nama operator, atau nama Wi-Fi dan Bluetooth. Semuanya dibaca dari ponsel dan digambar di layar, dan tidak ada yang disimpan atau dikirim.</string>
+
+    <!-- Ketika basemap tidak bisa dimuat, dan alasannya -->
+    <string name="maps_nokey">Kunci basemap tidak ada</string>
+    <string name="maps_nokey_sub">Build ini tidak menyertakan kunci CARTO.</string>
+    <string name="maps_refused">Kunci basemap ditolak</string>
+    <string name="maps_refused_sub">Kunci itu tidak diizinkan melayani aplikasi ini.</string>
+    <string name="maps_offline">Basemap tidak tersedia</string>
+    <string name="maps_offline_sub">Tidak ada koneksi, atau layanan petaknya sedang mati.</string>
+    <string name="maps_key_page">Tentang kunci</string>
+
+    <!-- Status kunci basemap, ditampilkan dan bukan diubah -->
+    <string name="maps_key">Kunci basemap</string>
+    <string name="maps_key_on">Ada. Peta diambil dari CARTO, yang sejak September 2026 mewajibkan kunci pada setiap petak.</string>
+    <string name="maps_key_off">Tidak ada pada build ini, jadi peta tidak bisa digambar. Angka aktivitas jalan tetap berjalan: itu dari penghitung langkah milik ponsel.</string>
 </resources>
