@@ -18,43 +18,185 @@ class Section : Page() {
             PRODUCTIVITY -> productivity()
             REMINDERS -> reminders()
             CONNECT -> connect()
+            THEME -> theme()
+            TABS -> tabs()
             else -> about()
         }
     }
 
     private fun a11y() = Access.instance != null
 
+    // The island's colours.
+    //
+    // Nine palettes, four of them grey and five of them combinations. The grey
+    // ones are the island as it was and are listed first; the combinations
+    // name a ground and an accent, and the accent is what a primary button, a
+    // lit tile, the current page's mark and the logo are painted with. Body
+    // text stays white in all nine, which is why there is no contrast warning
+    // to give here: the only coloured things are the ones chosen to be looked
+    // at, and the text on top of them is picked for whichever of black or
+    // white reads against the accent.
+    private fun theme() {
+        header(getString(R.string.th_title))
+        note(getString(R.string.th_sub))
+        val now = prefs.str(Theme.KEY, "amoled")
+        // Two groups, each one laid out before it is filled: Page appends to a
+        // single column, so the label for the second group has to be added
+        // after the first group's rows are in it
+        label(getString(R.string.th_mono))
+        val plain = group()
+        for (t in Theme.all) if (!t.coloured) themeRow(plain, t, now)
+        label(getString(R.string.th_combo_group))
+        val combo = group()
+        for (t in Theme.all) if (t.coloured) themeRow(combo, t, now)
+        note(getString(R.string.th_note))
+    }
+
+    private fun themeRow(into: LinearLayout, t: Theme, now: String) {
+        row(into, getString(t.label), swatchText(t), swatch(t, t.key == now), Icon.Palette) {
+            prefs.set(Theme.KEY, t.key)
+            changed()
+            rebuild()
+        }
+    }
+
+    // What the palette is made of, said in words: a combination theme is a
+    // ground plus an accent, and which is which is the thing a swatch alone
+    // cannot tell you
+    private fun swatchText(t: Theme) =
+        if (t.coloured) getString(R.string.th_combo) else getString(R.string.th_plain)
+
+    // The palette itself, as the colours it actually paints with. Two dots for
+    // a grey theme — the ground and the white on it — and three for a
+    // combination, the third being the accent as it will really be drawn,
+    // lightened if the theme's own tone would not have read.
+    private fun swatch(t: Theme, current: Boolean): android.view.View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        val tones = ArrayList<Int>()
+        tones.add(t.back)
+        if (t.tier != 0) tones.add(t.tier)
+        tones.add(android.graphics.Color.WHITE)
+        if (t.coloured) tones.add(t.mark)
+        for (c in tones) {
+            row.addView(android.view.View(this).apply {
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.OVAL
+                    setColor(c)
+                    // A hairline, so a black swatch is still visible on a dark
+                    // page and a white one on a light page
+                    setStroke(maxOf(1, dpi(1f)), withAlpha(ink, 60))
+                }
+            }, LinearLayout.LayoutParams(dpi(16f), dpi(16f)).apply { marginEnd = dpi(4f) })
+        }
+        if (current) row.addView(android.view.View(this).apply {
+            background = IconDrawable(Icon.Check, ink, dpi(18f))
+        }, LinearLayout.LayoutParams(dpi(18f), dpi(18f)).apply { marginStart = dpi(6f) })
+        return row
+    }
+
+    // Which pages the island offers, and which notices may put themselves up.
+    //
+    // Two lists rather than one, because they are two different wants. A tab
+    // is a page reached by swiping, and turning one off is "I never go there";
+    // a live notice is a card that arrives on its own, and turning one off is
+    // "do not interrupt me with this". Music is in both, and deliberately:
+    // somebody may well want the lyric bar without the music page, or the
+    // other way round.
+    //
+    // Home is in neither list. Every other page is reached by swiping from it
+    // and the gear in the tab bar lives on it, so an island whose navigation
+    // had been emptied would have nothing behind the swipe at all — the switch
+    // would read as "turn the island off", which is what the master switch at
+    // the top of the app is for.
+    private fun tabs() {
+        header(getString(R.string.tabs_title))
+        note(getString(R.string.tabs_sub))
+        label(getString(R.string.tabs_pages))
+        val g = group()
+        row(g, getString(R.string.home), getString(R.string.tabs_home_always), icon = Icon.Home)
+        for ((id, title, icon) in PAGES) {
+            toggle(g, getString(title), null, prefs.tabOn(id), icon = icon) { prefs.setTab(id, it); changed() }
+        }
+        label(getString(R.string.tabs_notices))
+        val n = group()
+        for ((id, title, icon) in NOTICES) {
+            toggle(n, getString(title), null, prefs.liveOn(id), icon = icon) { prefs.setLive(id, it); changed() }
+        }
+        note(getString(R.string.tabs_note))
+    }
+
     private fun island() {
         header(getString(R.string.section_island))
         val g = group()
-        toggle(g, getString(R.string.idle_bar), getString(R.string.idle_bar_sub), prefs.idleBar, icon = Icon.Layers) {
-            prefs.idleBar = it; changed()
+        row(g, getString(R.string.th_title), getString(R.string.th_row_sub, getString(Theme.of(prefs).label)), icon = Icon.Palette) {
+            startActivity(Intent(this, Section::class.java).putExtra(MODE, THEME))
         }
-        slider(g, getString(R.string.idle_width), Prefs.IDLE_WIDTH_MIN, Prefs.IDLE_WIDTH_MAX, prefs.idleWidthDp, { "$it dp" }, Icon.Chevron) {
-            prefs.idleWidthDp = it
-            changed()
+        row(g, getString(R.string.tabs_title), getString(R.string.tabs_row_sub), icon = Icon.Layers) {
+            startActivity(Intent(this, Section::class.java).putExtra(MODE, TABS))
         }
-        toggle(g, getString(R.string.nav_always), getString(if (prefs.navAlways) R.string.nav_always_on else R.string.nav_always_off), prefs.navAlways, icon = Icon.Tasks) {
+        row(g, getString(R.string.apps_pin), getString(R.string.apps_pin_row_sub, Shortcuts(this, prefs).stored().size, Shortcuts.MAX), icon = Icon.Grid) {
+            startActivity(Intent(this, Pins::class.java))
+        }
+        label(getString(R.string.idle_bar))
+        val c = group()
+        toggle(c, getString(R.string.idle_bar), getString(R.string.idle_bar_sub), prefs.idleBar, icon = Icon.Layers) {
+            prefs.idleBar = it; changed(); rebuild()
+        }
+        if (prefs.idleBar) {
+            slider(c, getString(R.string.idle_width), Prefs.IDLE_WIDTH_MIN, Prefs.IDLE_WIDTH_MAX, prefs.idleWidthDp, { "$it dp" }, Icon.Chevron) {
+                prefs.idleWidthDp = it
+                changed()
+            }
+            // What the capsule carries where the battery used to be. The list
+            // is in Badge, in the order it is offered, so the page and the
+            // drawing cannot drift apart.
+            choice(c, getString(R.string.badge_title), Badge.entries.map { it to getString(Badge.label(it)) },
+                Badge.of(prefs), Icon.Battery) { Badge.set(prefs, it); changed(); rebuild() }
+            val badge = Badge.of(prefs)
+            if (badge == Badge.Text) {
+                // The user's own line. Saved on the button rather than as it
+                // is typed: a capsule that changed under every keystroke would
+                // be redrawing the island while somebody was still deciding
+                // what to put in it.
+                val f = field(getString(R.string.badge_text_hint), value = prefs.str(Badge.TEXT_KEY, ""))
+                f.inputType = android.text.InputType.TYPE_CLASS_TEXT
+                form(c, f, button(getString(R.string.save)) {
+                    prefs.set(Badge.TEXT_KEY, f.text.toString().trim().take(Badge.TEXT_MAX))
+                    changed()
+                    toast(getString(R.string.saved))
+                })
+                note(getString(R.string.badge_text_note, Badge.TEXT_MAX))
+            }
+            if (badge == Badge.Cpu) note(getString(R.string.badge_cpu_note))
+            if (badge == Badge.Provider || badge == Badge.Wifi || badge == Badge.Bluetooth) note(getString(R.string.badge_name_note))
+        }
+        label(getString(R.string.gestures_group))
+        val b = group()
+        toggle(b, getString(R.string.nav_always), getString(if (prefs.navAlways) R.string.nav_always_on else R.string.nav_always_off), prefs.navAlways, icon = Icon.Tasks) {
             prefs.navAlways = it; changed(); rebuild()
         }
-                toggle(g, getString(R.string.camera_tap), getString(if (a11y()) R.string.camera_tap_sub else R.string.camera_tap_off), prefs.cameraTap, a11y(), Icon.Camera) {
+        toggle(b, getString(R.string.camera_tap), getString(if (a11y()) R.string.camera_tap_sub else R.string.camera_tap_off), prefs.cameraTap, a11y(), Icon.Camera) {
             prefs.cameraTap = it; changed()
         }
-        toggle(g, getString(R.string.lockscreen), getString(R.string.lockscreen_sub), prefs.bool("lockscreen", true), icon = Icon.Shield) {
+        toggle(b, getString(R.string.lockscreen), getString(R.string.lockscreen_sub), prefs.bool("lockscreen", true), icon = Icon.Shield) {
             prefs.set("lockscreen", it); changed()
         }
-        slider(g, getString(R.string.offset), Prefs.OFFSET_MIN, Prefs.OFFSET_MAX, prefs.offsetDp, { (if (it > 0) "+$it" else "$it") + " dp" }, Icon.Pin) {
+        slider(b, getString(R.string.offset), Prefs.OFFSET_MIN, Prefs.OFFSET_MAX, prefs.offsetDp, { (if (it > 0) "+$it" else "$it") + " dp" }, Icon.Pin) {
             prefs.offsetDp = it
             changed()
             Listener.instance?.test()
         }
-        // Names in Home's Wi-Fi and Bluetooth tiles. Optional: the tiles work
-        // without them, they just say Wi-Fi and Bluetooth.
+        // Names in Home's Wi-Fi and Bluetooth tiles, and in the capsule's own
+        // badges. Optional: the tiles work without them, they just say Wi-Fi
+        // and Bluetooth.
         val need = Radios.missing(this)
-        row(g, getString(R.string.radio_names), getString(if (need.isEmpty()) R.string.radio_names_on else R.string.radio_names_sub),
+        row(b, getString(R.string.radio_names), getString(if (need.isEmpty()) R.string.radio_names_on else R.string.radio_names_sub),
             if (need.isEmpty()) null else button(getString(R.string.grant)) { requestPermissions(need, REQ_RADIOS) }, Icon.Wifi)
         // Sideways the island has nowhere to be, so it becomes a notch with
-        // one eye in it instead of disappearing
+        // a pair of eyes in it instead of disappearing
         label(getString(R.string.notch))
         val n = group()
         toggle(n, getString(R.string.notch_bar), getString(R.string.notch_bar_sub), prefs.notchBar, icon = Icon.Eye) {
@@ -75,9 +217,12 @@ class Section : Page() {
                 prefs.notchEye = it
                 changed()
             }
+            toggle(n, getString(R.string.eye_sway), getString(R.string.eye_sway_sub), prefs.eyeSway, icon = Icon.Music) {
+                prefs.eyeSway = it; changed()
+            }
             note(getString(R.string.notch_note))
         }
-                label(getString(R.string.gestures))
+        label(getString(R.string.gestures))
         val h = group()
         for ((t, d, i) in listOf(
             Triple(R.string.g_tap, R.string.g_tap_sub, Icon.Hand),
@@ -138,6 +283,47 @@ class Section : Page() {
             Quad("act.saver", R.string.act_saver, R.string.act_saver_sub, Icon.Leaf),
         )) toggle(m2, getString(title), getString(detail), prefs.bool(key, true), icon = icon) { prefs.set(key, it); changed() }
         note(getString(R.string.act_hotspot_note))
+
+        // Where the phone is, and how far it has walked today
+        label(getString(R.string.tab_maps))
+        val w = group()
+        val walkOk = Listener.instance?.steps?.canCount() ?: false
+        val hasSensor = Listener.instance?.steps?.hasCounter() ?: false
+        toggle(w, getString(R.string.act_walk), getString(R.string.act_walk_sub), prefs.steps, icon = Icon.Stretch) {
+            prefs.steps = it; changed(); rebuild()
+        }
+        if (!hasSensor) note(getString(R.string.act_walk_nosensor))
+        else if (!walkOk) row(w, getString(R.string.act_walk_perm), getString(R.string.act_walk_perm_sub),
+            button(getString(R.string.grant)) { requestPermissions(Steps.permission(), REQ_WALK) }, Icon.Stretch)
+        if (prefs.steps) {
+            // The stride the step count is turned into metres with, and the
+            // weight the calorie figure needs. Both are the user's own, and
+            // both are asked for rather than guessed because a stride from an
+            // assumed height is where a step-based distance goes wrong.
+            slider(w, getString(R.string.body_height), Prefs.HEIGHT_MIN, Prefs.HEIGHT_MAX, prefs.heightCm, { "$it cm" }, Icon.User) {
+                prefs.heightCm = it
+                changed()
+            }
+            slider(w, getString(R.string.body_weight), Prefs.WEIGHT_MIN, Prefs.WEIGHT_MAX, prefs.weightKg, { "$it kg" }, Icon.User) {
+                prefs.weightKg = it
+                changed()
+            }
+            note(getString(R.string.act_walk_note))
+        }
+
+        // The screen turned most of the way up
+        label(getString(R.string.glare_group))
+        val gl = group()
+        toggle(gl, getString(R.string.glare_warn), getString(R.string.glare_warn_sub), prefs.glareWarn, icon = Icon.Eye) {
+            prefs.glareWarn = it; changed(); rebuild()
+        }
+        if (prefs.glareWarn) {
+            slider(gl, getString(R.string.glare_at), Prefs.GLARE_MIN, Prefs.GLARE_MAX, prefs.glareAt, { "$it%" }, Icon.Flash) {
+                prefs.glareAt = it
+                changed()
+            }
+            note(getString(R.string.glare_note))
+        }
     }
 
     // The watcher holds a permission state and a switch; both are settled at
@@ -378,12 +564,21 @@ class Section : Page() {
                 changed()
                 rebuild()
             }
+            REQ_WALK -> {
+                // The counter can only be registered once the recognition
+                // permission is in; a refusal leaves the figure at nothing and
+                // the page says so
+                Listener.instance?.let { it.steps.stop(); it.steps.start() }
+                changed()
+                rebuild()
+            }
         }
     }
 
     companion object {
         private const val REQ_RADIOS = 7
         private const val REQ_SHOT = 8
+        private const val REQ_WALK = 9
         const val MODE = "mode"
         const val LINK = "link"
         const val ISLAND = "island"
@@ -392,5 +587,44 @@ class Section : Page() {
         const val REMINDERS = "reminders"
         const val CONNECT = "connect"
         const val ABOUT = "about"
+        const val THEME = "theme"
+        const val TABS = "tabs"
+
+        // The pages the island offers behind a swipe, with their switches.
+        //
+        // Scene ids, so the switch and the page it hides cannot drift: the
+        // island asks prefs.tabOn with exactly these strings. Home is not in
+        // the list on purpose — see tabs().
+        private val PAGES = listOf(
+            Triple("music", R.string.tab_music, Icon.Music),
+            Triple("timer", R.string.t_timer, Icon.Timer),
+            Triple("agenda", R.string.tab_agenda, Icon.Book),
+            Triple("prayer", R.string.tab_prayer, Icon.Moon),
+            Triple("agents", R.string.laptop, Icon.Laptop),
+            Triple("notes", R.string.notes, Icon.Note),
+            Triple("shelf", R.string.shelf, Icon.Shelf),
+            Triple("github", R.string.tab_github, Icon.Github),
+            Triple("shots", R.string.tab_shots, Icon.Image),
+            Triple("maps", R.string.tab_maps, Icon.Pin),
+            Triple("apps", R.string.tab_apps, Icon.Grid),
+        )
+
+        // And the notices that may put themselves up without being asked.
+        // Separate list, separate switches: a page is somewhere to go and a
+        // notice is something that arrives.
+        private val NOTICES = listOf(
+            Triple("music", R.string.tab_music, Icon.Music),
+            Triple("message", R.string.messages, Icon.Chat),
+            Triple("incoming", R.string.act_call, Icon.Phone),
+            Triple("nav", R.string.act_nav, Icon.Nav),
+            Triple("progress", R.string.act_progress, Icon.Download),
+            Triple("shot", R.string.act_shot, Icon.Image),
+            Triple("volume", R.string.act_volume, Icon.Volume),
+            Triple("flag", R.string.act_modes, Icon.Spark),
+            Triple("privacy", R.string.act_privacy, Icon.Shield),
+            Triple("translate", R.string.translate, Icon.Globe),
+            Triple("brief", R.string.act_charge, Icon.Bolt),
+            Triple("alert", R.string.section_reminders, Icon.Bell),
+        )
     }
 }

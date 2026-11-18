@@ -36,6 +36,24 @@ class Access : AccessibilityService() {
 
     override fun onInterrupt() = Unit
 
+    // Lock the screen, without the side button.
+    //
+    // This is the one thing on Home that genuinely cannot be done any other
+    // way. An app may not lock the screen: the only two routes Android offers
+    // are a device admin, which is a heavyweight enrolment that also hands the
+    // app the power to wipe the phone, and this — the accessibility service's
+    // own global action, which exists from Android 9 and does exactly one
+    // thing. Tepi already runs an accessibility service for the window above
+    // the status bar, so the second route costs nothing extra and asks for
+    // nothing the user has not already granted.
+    //
+    // False when the service is not running, so the tile can say so rather
+    // than appear to do nothing.
+    fun lockScreen(): Boolean {
+        if (android.os.Build.VERSION.SDK_INT < 28) return false
+        return try { performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN) } catch (_: Throwable) { false }
+    }
+
     override fun onUnbind(intent: Intent?): Boolean {
         gone()
         return super.onUnbind(intent)

@@ -439,4 +439,121 @@
     <string name="notch_size">Notch size</string>
     <string name="notch_eye">Eye size</string>
     <string name="notch_note">The notch stays up in games, videos, and fullscreen apps, which is where the island itself is hidden. Hide for an hour from the island\'s menu puts it away as well. The eyes are held inside the block whatever the two sizes say, so big eyes in a small notch are as big as the notch allows and no bigger.</string>
+
+    <!-- Island theme: nine palettes, four grey and five combinations -->
+    <string name="th_title">Island colour</string>
+    <string name="th_row_sub">%1$s</string>
+    <string name="th_sub">What the island itself is painted with. Body text stays white in every palette: the colour is for the things meant to be looked at first, which are the primary button, the page you are on, a lit tile, and the mark.</string>
+    <string name="th_mono">One tone</string>
+    <string name="th_combo_group">Combinations</string>
+    <string name="th_plain">A dark ground and white on it.</string>
+    <string name="th_combo">A coloured ground with a second colour for the parts meant to be noticed, and white and black for everything else.</string>
+    <string name="th_note">Black is the default because it is what a notch is, and on an OLED panel it is the one colour that genuinely disappears into the bezel. The combinations cost a little more battery on an OLED screen for the same reason.</string>
+    <string name="th_amoled">Amoled</string>
+    <string name="th_dark">Dark</string>
+    <string name="th_dark_gray">Dark Gray</string>
+    <string name="th_gray">Gray</string>
+    <string name="th_royal">Royal Blue</string>
+    <string name="th_violet">Violet</string>
+    <string name="th_midnight">Midnight Blue</string>
+    <string name="th_crimson">Crimson</string>
+    <string name="th_neon">Neon</string>
+
+    <!-- Which pages and notices the island offers -->
+    <string name="tabs_title">Pages and notices</string>
+    <string name="tabs_row_sub">Turn off the pages you never swipe to and the notices you would rather not see.</string>
+    <string name="tabs_sub">Two lists, because they are two different things. A page is somewhere you go by swiping; a notice is a card that arrives on its own.</string>
+    <string name="tabs_pages">Pages</string>
+    <string name="tabs_notices">Notices</string>
+    <string name="tabs_home_always">Always on. Every other page is reached by swiping from Home, and the settings gear lives on its bar.</string>
+    <string name="tabs_note">A page with nothing to show is left out of the swipe by itself, so a switch here is for the pages you never want rather than the ones that happen to be empty.</string>
+
+    <!-- The resting capsule's right-hand mark -->
+    <string name="badge_title">Capsule mark</string>
+    <string name="badge_none">Nothing</string>
+    <string name="badge_battery">Battery</string>
+    <string name="badge_circle">Battery ring</string>
+    <string name="badge_dot">Battery dot</string>
+    <string name="badge_clock">Clock</string>
+    <string name="badge_cpu">CPU</string>
+    <string name="badge_ram">RAM</string>
+    <string name="badge_provider">Carrier name</string>
+    <string name="badge_text">Your own text</string>
+    <string name="badge_wifi">Wi-Fi name</string>
+    <string name="badge_bluetooth">Bluetooth name</string>
+    <string name="badge_cpu_at">%1$d%% CPU</string>
+    <string name="badge_ram_at">%1$d%% RAM</string>
+    <string name="badge_text_hint">Anything you like</string>
+    <string name="badge_text_note">Up to %1$d characters, and shortened with a … when the capsule is too narrow for all of it. Make the capsule wider above and more of it shows.</string>
+    <string name="badge_cpu_note">Android closed /proc to apps in version 8, so the CPU figure is missing on many phones. Where it is refused the capsule simply shows nothing rather than a made-up number.</string>
+    <string name="badge_name_note">Shortened with a … when the name is longer than the capsule. Make the capsule wider above and more of it shows. Wi-Fi and Bluetooth names need the permission in Names, above.</string>
+    <string name="saved">Saved</string>
+
+    <!-- The eyes sway to whatever is playing -->
+    <string name="eye_sway">Sway to music</string>
+    <string name="eye_sway_sub">While something is playing the eyes drift slowly left and right along a shallow arc, and change shape a little as they go. They still blink. It is the only thing the notch can say about a song: there is no room out here for a title.</string>
+
+    <!-- Home: mobile data and the lock screen -->
+    <string name="q_data">Mobile data</string>
+    <string name="q_lock">Lock screen</string>
+    <string name="q_on">On</string>
+    <string name="q_off">Off</string>
+    <string name="q_lock_sub">Tap to lock</string>
+    <string name="q_lock_need">Needs the accessibility switch</string>
+
+    <!-- Brightness warning -->
+    <string name="glare_group">Brightness</string>
+    <string name="glare_warn">Warn when too bright</string>
+    <string name="glare_warn_sub">A card when the screen goes most of the way up, which is almost always the slider left where daylight put it.</string>
+    <string name="glare_at">Warn above</string>
+    <string name="glare_title">Too bright! Look after your eyes</string>
+    <string name="glare_body">The screen is at %1$d%%. Indoors that is a lamp at reading distance.</string>
+    <string name="glare_fix">Turn it down</string>
+    <string name="glare_note">Said once per trip over the line, and not again until the brightness comes back down — a warning that repeated every time the slider twitched would be a warning you learn to ignore.</string>
+
+    <!-- The Maps tab, and the walking under it -->
+    <string name="tab_maps">Maps</string>
+    <string name="maps_need">The map needs to know where the phone is. Nothing is sent anywhere: the position is used to pick which map squares to draw and is never stored.</string>
+    <string name="maps_finding">Finding you…</string>
+    <string name="maps_open">Open in maps</string>
+    <string name="maps_body">Your height and weight</string>
+    <string name="maps_from_steps">Distance from your step count and stride.</string>
+    <string name="maps_from_gps">Distance corrected from the route while this page is open.</string>
+    <string name="maps_steps_need">Step counting needs the physical activity permission.</string>
+    <string name="n_km">%1$s km</string>
+    <string name="n_m">%1$d m</string>
+    <string name="unit_km">km</string>
+    <string name="unit_steps">Steps</string>
+    <string name="unit_time">Moving</string>
+    <string name="unit_kcal">kcal</string>
+    <string name="act_walk">Walking</string>
+    <string name="act_walk_sub">Distance, steps, time moving and the energy it cost, under the map.</string>
+    <string name="act_walk_perm">Physical activity</string>
+    <string name="act_walk_perm_sub">Needed to read the phone\'s own step counter.</string>
+    <string name="act_walk_nosensor">This phone has no step counter, so a day\'s total is not available. The distance is measured from the route instead, while the map is open.</string>
+    <string name="act_walk_note">Steps come from the phone\'s own low-power counter, which keeps counting while the screen is off and costs almost no battery. The distance is that count times your stride, worked out from your height; while the map is open it is corrected from the route itself, which is more accurate. The energy figure is the standard one for walking, about 0.75 kcal per kilogram per kilometre. Body fat cannot be measured by a phone at all — that needs a scale that passes a current through you — so it is not offered.</string>
+
+    <!-- Apps pinned to the island -->
+    <string name="tab_apps">Apps</string>
+    <string name="apps_pin">Island shortcuts</string>
+    <string name="apps_pin_row_sub">%1$d of %2$d chosen</string>
+    <string name="apps_pin_sub">Up to %1$d apps, as a grid of icons on the island. System apps are not listed.</string>
+    <string name="apps_pin_on">On the island · %1$d of %2$d</string>
+    <string name="apps_pin_full">Full at %1$d. Turn one off first.</string>
+    <string name="apps_pin_empty">No apps yet. Pick the few you open all day and they are one swipe away from anywhere.</string>
+    <string name="apps_pin_choose">Choose apps</string>
+    <string name="apps_pin_edit">Edit list</string>
+
+    <!-- Group headings -->
+    <string name="gestures_group">Behaviour</string>
+    <string name="tab_music">Music</string>
+    <string name="tab_github">GitHub</string>
+    <string name="body_height">Height</string>
+    <string name="body_weight">Weight</string>
+
+    <string name="reads_maps">Your position, while the Maps page is open and only then. It picks which map squares to draw and is never stored or sent anywhere. The squares themselves are fetched from CARTO\'s map service, which sees the request for a square of the world and nothing else — not who asked, and not where you are, because a square is about a kilometre across and millions of people live in each one.</string>
+    <string name="reads_steps">The phone\'s own step counter, which counts in a low-power chip and never leaves the phone. Your height and weight, which you type in yourself, are stored on the phone and used only to work out the distance and the energy figure.</string>
+    <string name="reads_pins">The list of apps installed on the phone, to show you which ones you can pin. Only the ones you pick are remembered, as package names.</string>
+    <string name="reads_glare">The screen brightness setting, read to notice when it is most of the way up. Nothing is written: the warning only tells you, and the button takes you to the system\'s own page.</string>
+    <string name="reads_badge">Whatever the capsule mark you picked shows: the clock, the memory in use, the carrier\'s name, or the Wi-Fi and Bluetooth names. All of it is read from the phone and drawn on screen, and none of it is stored or sent.</string>
 </resources>

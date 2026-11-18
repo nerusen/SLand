@@ -3,7 +3,6 @@ package io.github.odlaver.tepi
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PixelFormat
@@ -118,7 +117,11 @@ class Notch(
     }
 
     private inner class Face(c: Context) : View(c) {
-        private val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
+        // The theme's own ground, read per frame rather than captured: the
+        // island hands this Ui its colours back on a settings change, and a
+        // colour copied into a paint at construction would leave the notch the
+        // only black thing on a violet phone
+        private val bg = Paint(Paint.ANTI_ALIAS_FLAG)
         private val shape = Path()
         private val body = RectF()
 
@@ -161,6 +164,7 @@ class Notch(
             val r = min(dep * CORNER, cap)
             shape.reset()
             ui.block(shape, body, r, min(f * k, min(len / 2, dep)))
+            bg.color = ui.back
             canvas.drawPath(shape, bg)
 
             // The eyes, centred. Their height comes from the block's depth,
@@ -375,6 +379,15 @@ class Notch(
 
     fun battery(level: Int, charging: Boolean) {
         eye.battery(level, charging)
+        if (attached) kick()
+    }
+
+    // Something is playing, or it has stopped. The eyes sway while it does,
+    // which is the only thing the notch can say about music: there is no room
+    // out here for a title, and a title is not what someone watching sideways
+    // with a song on is missing.
+    fun music(playing: Boolean) {
+        eye.music(playing)
         if (attached) kick()
     }
 

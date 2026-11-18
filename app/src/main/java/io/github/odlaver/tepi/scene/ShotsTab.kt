@@ -45,23 +45,50 @@ class ShotsTab(host: Host, private val capture: Capture, private val all: () -> 
     override fun tab() = capture.tabOn()
 
     private val gap get() = ui.s4
-    private val cellH get() = ui.dp(CELL_H)
-    private val cellW get() = cellH * SHAPE
 
-    // As many cells as fit the panel, within reason: a very wide panel should
-    // not turn two rows into a contact sheet
-    private fun cols(w: Float) = (((w + gap) / (cellW + gap)).toInt()).coerceIn(3, MAX_COLS)
+    // Cells fill the panel's width rather than being a fixed size.
+    //
+    // They used to be a fixed 68 dp tall at a phone's own aspect, and as many
+    // as happened to fit went in a row — which on most panels came out at
+    // four and a half, so four were drawn and the last cell's worth of width
+    // was left blank down the right-hand side. A grid that does not reach the
+    // edge of the thing it is in reads as a mistake, and it was.
+    //
+    // So the column count is chosen first, four across, and the cells are
+    // sized to fit it exactly: eight recent captures and a row that reaches
+    // both edges.
+    //
+    // The height does not simply follow from that width, though, and this is
+    // the part that is worth saying out loud. A quarter of a panel is around
+    // 76 dp wide, and a cell that tall-and-thin at a phone's real proportions
+    // would be 136 dp high — two rows of that is a panel taller than most of
+    // the pages in the island put together, which is how a picker turns into a
+    // page. So the height is capped, and what gives is the crop: the cell ends
+    // up a little wider than a phone screen and the thumbnail is centre-cropped
+    // to it, losing a sliver off the top and bottom. That is the right thing to
+    // lose. What a screenshot is recognised by is its middle — the map, the
+    // chat, the receipt — and the parts being trimmed are the status bar and
+    // the navigation bar, which are identical in every capture and so carry no
+    // information at all.
+    private fun cols() = COLS
 
-    private fun list(w: Float) = capture.shots.take(cols(w) * ROWS)
+    private fun cellW(w: Float) = (w - gap * (cols() - 1)) / cols()
 
-    private fun rows(n: Int, cols: Int) = min(ROWS, ceil(n / cols.toFloat()).toInt()).coerceAtLeast(1)
+    // A phone's own shape where there is room for it, and no taller than the
+    // cap when there is not
+    private fun cellH(w: Float) = min(ui.dp(CELL_MAX), cellW(w) / SHAPE)
+
+    private fun list(w: Float) = capture.shots.take(cols() * ROWS)
+
+    private fun rows(n: Int) = min(ROWS, ceil(n / cols().toFloat()).toInt()).coerceAtLeast(1)
 
     override fun panelHeight(w: Float): Float {
         val head = ui.dp(18f) + ui.s12
         val n = list(w).size
         if (n == 0) return head + ui.dp(36f) + ui.s12 + ui.btnH
-        val rows = rows(n, cols(w))
-        return head + rows * cellH + (rows - 1) * gap + ui.s12 + ui.btnH
+        val rows = rows(n)
+        val ch = cellH(w)
+        return head + rows * ch + (rows - 1) * gap + ui.s12 + ui.btnH
     }
 
     override fun drawPanel(c: Canvas, r: RectF, a: Float) {
@@ -81,17 +108,19 @@ class ShotsTab(host: Host, private val capture: Capture, private val all: () -> 
         }
         // A capture that has since been deleted must not keep the action row
         val sel = shots.firstOrNull { it.uri == picked } ?: shots.first()
-        val cols = cols(r.width())
-        val rows = rows(shots.size, cols)
-        grid.set(r.left, y, r.right, y + rows * cellH + (rows - 1) * gap)
+        val cols = cols()
+        val rows = rows(shots.size)
+        val cw = cellW(r.width())
+        val ch = cellH(r.width())
+        grid.set(r.left, y, r.right, y + rows * ch + (rows - 1) * gap)
         val radius = ui.dp(8f)
         for ((i, s) in shots.withIndex()) {
             val row = i / cols
             if (row >= rows) break
-            val left = r.left + (i % cols) * (cellW + gap)
-            val top = y + row * (cellH + gap)
-            cell.set(left, top, left + cellW, top + cellH)
-            if (s.thumb != null) ui.art(c, s.thumb, cell, a, radius / cellW)
+            val left = r.left + (i % cols) * (cw + gap)
+            val top = y + row * (ch + gap)
+            cell.set(left, top, left + cw, top + ch)
+            if (s.thumb != null) ui.art(c, s.thumb, cell, a, radius / cw)
             else {
                 ui.fill(c, cell, radius, ui.fill, a)
                 ui.icon(c, Icon.Image, cell.centerX(), cell.centerY(), ui.dp(16f), ui.sub, a)
@@ -129,12 +158,22 @@ class ShotsTab(host: Host, private val capture: Capture, private val all: () -> 
     }
 
     companion object {
-        // Two rows of small portraits: tall enough to recognise, short enough
-        // that the panel is still a panel
+        // Four across, two down: eight captures, and the row reaches both
+        // edges of the panel instead of stopping a cell short of the right.
+        // Four rather than five because a screenshot narrower than this stops
+        // being recognisable as the screen it came off; four rather than three
+        // because three at this width are large enough to be a gallery rather
+        // than a picker.
+        private const val COLS = 4
         private const val ROWS = 2
-        private const val MAX_COLS = 6
-        private const val CELL_H = 68f
-        // Cell width over its height, roughly a phone screen's shape
+        // Cell width over its height, roughly a phone screen's shape. The
+        // cells are sized from the panel now, so this sets how tall they want
+        // to be rather than how wide.
         private const val SHAPE = 0.56f
+        // And how tall they are actually allowed to get. Two rows of this plus
+        // the heading and the button row come out around 215 dp, which is the
+        // same order as the music page and the agenda — a picker that is one
+        // of the island's pages rather than a page of its own.
+        private const val CELL_MAX = 76f
     }
 }

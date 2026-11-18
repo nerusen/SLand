@@ -63,6 +63,10 @@ class Listener : NotificationListenerService() {
     lateinit var capture: Capture
     lateinit var volume: Volume
     lateinit var flags: Flags
+    lateinit var steps: Steps
+    lateinit var shortcuts: Shortcuts
+    private lateinit var glare: Glare
+    lateinit var maps: Maps
     private var briefs: BriefScene? = null
     private var privacyScene: PrivacyScene? = null
     private var timerScene: TimerScene? = null
@@ -100,6 +104,13 @@ class Listener : NotificationListenerService() {
             ensureIsland()
             flagScene?.show(flag, on)
         }
+        // Walking: the step counter all day, and GPS only while the map is up
+        steps = Steps(this, prefs) { island?.refresh() }
+        shortcuts = Shortcuts(this, prefs)
+        maps = Maps(cacheDir)
+        // The screen turned most of the way up, which is almost always the
+        // slider left where daylight put it
+        glare = Glare(this, prefs) { pct -> tooBright(pct) }
         live = Live(this, prefs, { n, pkg -> n.getLargeIcon()?.loadDrawable(this)?.let { bitmap(it) } ?: appIcon(pkg) }) { island?.refresh() }
         watch = Watch(this, prefs, brief = { k, t -> briefs?.show(k, t) }, lowBattery = { lowBattery(it) }, battery = { l, c ->
             pc.battery(l, c)
@@ -129,6 +140,8 @@ class Listener : NotificationListenerService() {
             capture.start()
             volume.start()
             flags.start()
+            steps.start()
+            glare.start()
             try { activeNotifications?.forEach { live.posted(it) } } catch (_: Exception) { }
             ensureIsland()
         } else {
@@ -143,6 +156,8 @@ class Listener : NotificationListenerService() {
             capture.stop()
             volume.stop()
             flags.stop()
+            steps.stop()
+            glare.stop()
             live.clear()
         }
         Tile.refresh(this)
@@ -170,6 +185,9 @@ class Listener : NotificationListenerService() {
         capture.stop()
         volume.stop()
         flags.stop()
+        steps.stop()
+        glare.stop()
+        maps.clear()
         live.clear()
         media?.stop()
         media = null
@@ -246,6 +264,20 @@ class Listener : NotificationListenerService() {
         isl.register(io.github.odlaver.tepi.scene.ShotsTab(isl, capture) {
             isl.open(android.content.Intent(android.content.Intent.ACTION_VIEW, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI))
         })
+        // Where the phone is, and how far it has walked today
+        val mapsTab = io.github.odlaver.tepi.scene.MapsTab(isl, maps, steps, prefs,
+            settings = { section(Section.ACTIVITIES) }) { askWalk() }
+        isl.register(mapsTab)
+        // The map holds GPS fixes open while it is the page on screen, so it
+        // is told which page is open rather than left to notice
+        isl.closers.add { id -> if (id != mapsTab.id) mapsTab.away() }
+        // Pinned apps, as a grid of icons
+        isl.register(io.github.odlaver.tepi.scene.AppsTab(isl, shortcuts) {
+            startActivity(android.content.Intent(this, Pins::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+        })
+        // The capsule's Wi-Fi and Bluetooth badges read the same watcher the
+        // Home tiles do
+        isl.wireBadges(radios)
         isl.home.rows.add(TaskRow(isl, agenda, agendaTab))
         isl.home.rows.add(NoteRow(isl, notes) { open(Items::class.java, Items.NOTES) })
         isl.home.rows.add(ShelfRow(isl, shelf) { picked(it) })
@@ -309,6 +341,23 @@ class Listener : NotificationListenerService() {
 
     private fun lowBattery(level: Int) {
         alert(Alert("battery", getString(R.string.low_battery, level), getString(R.string.low_battery_body), Glyph.Bolt, ms = 6000))
+    }
+
+    // The screen is most of the way up. Said as a card rather than a line,
+    // because there is something to do about it and the card can carry the
+    // button: the display settings page, where the slider is.
+    private fun tooBright(pct: Int) {
+        val fix = Action(getString(R.string.glare_fix), primary = true, icon = Icon.Eye) {
+            island?.open(android.content.Intent(android.provider.Settings.ACTION_DISPLAY_SETTINGS))
+        }
+        alert(Alert("glare", getString(R.string.glare_title), getString(R.string.glare_body, pct), Glyph.Eye, listOf(fix), 8000))
+    }
+
+    // The step counter needs a permission, and the only place to ask for one
+    // is an activity. The settings page is where the figure is explained, so
+    // that is where the request is made from too.
+    private fun askWalk() {
+        section(Section.ACTIVITIES)
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {

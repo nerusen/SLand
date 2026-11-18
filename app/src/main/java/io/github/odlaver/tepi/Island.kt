@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PixelFormat
@@ -56,10 +55,14 @@ class Island(
     // Idle: a resting capsule when nothing is happening
     private enum class Kind { Hidden, Idle, Compact, Panel }
 
-    override val ui = Ui(context)
+    override val ui = Ui(context, prefs)
     override val ctx: Context get() = context
     private val keyguard = context.getSystemService(android.app.KeyguardManager::class.java)
     override val locked get() = keyguard.isKeyguardLocked
+
+    // What the resting capsule carries where the battery used to be, and the
+    // readings behind it
+    private val badges = Badges(context, prefs)
 
     // Lock and unlock change what may be shown
     private val lockWatch = object : android.content.BroadcastReceiver() {
@@ -176,7 +179,7 @@ class Island(
     // on every frame, so refresh settles it once
     private var pageList: List<Scene> = emptyList()
 
-    private val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
+    private val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = ui.back }
     private val shape = Path()
     private val tierA = Path()
     private val tierB = Path()
@@ -194,6 +197,11 @@ class Island(
         scenes.add(scene)
         if (homeRow != null) home.rows.add(homeRow)
     }
+
+    // The Wi-Fi and Bluetooth names the capsule's own badges show come from
+    // the same watcher Home's tiles read, so the two can never disagree about
+    // what the phone is connected to
+    fun wireBadges(radios: Radios) = badges.wire(radios)
 
     fun attach() {
         if (attached) return
@@ -238,7 +246,13 @@ class Island(
         messages.show(m)
     }
 
-    fun mediaChanged() = music.changed()
+    fun mediaChanged() {
+        music.changed()
+        // Sideways the eyes sway to whatever is playing, so a song starting or
+        // stopping is news to the notch even when the island itself has
+        // nothing to show for it
+        notch?.music(prefs.eyeSway && music.playing)
+    }
 
     // Straight from ACTION_BATTERY_CHANGED, so the resting capsule shows the
     // same level Android does
@@ -262,9 +276,31 @@ class Island(
     }
 
     fun prefsChanged() {
+        // The theme is read into the kit rather than rebuilt around it: every
+        // scene holds a reference to this Ui and to the paints inside it, so a
+        // new one would leave every page drawing in the old colours until the
+        // island was torn down and put back up
+        ui.reseed()
+        bg.color = ui.back
         measureScreen()
         music.reload()
         refresh()
+    }
+
+    // Pages that hold a system resource while they are on screen are told
+    // which page is open now, so they can stand down when it is not them.
+    //
+    // The map and its location fixes are the only one so far, and it is worth
+    // the hook rather than letting the page notice for itself: a page cannot
+    // tell that it has stopped being drawn, because the thing that would have
+    // told it is the frame loop, and the frame loop stops with the panel. The
+    // id is passed rather than the scene so a page can compare without having
+    // to be handed a reference to its siblings; null means nothing is open.
+    val closers = ArrayList<(String?) -> Unit>()
+
+    private fun told() {
+        val id = opened?.id
+        for (f in closers) f(id)
     }
 
     fun openHome() = expand(home)
@@ -273,6 +309,12 @@ class Island(
     override fun expand(scene: Scene) {
         opened = scene
         lastTouch = SystemClock.uptimeMillis()
+        // A page change is also a page being left, so whoever was holding
+        // something open is told before the new one is drawn. The music lock
+        // is spent the moment the music page is no longer the one open, which
+        // is the rule it exists with: see held().
+        told()
+        if (scene !== music) music.unlock()
         armClose()
         refresh()
     }
@@ -280,6 +322,8 @@ class Island(
     override fun collapse() {
         if (opened == null) return
         opened = null
+        told()
+        music.unlock()
         refresh()
     }
 
@@ -312,8 +356,28 @@ class Island(
     }
 
     private val closePanel = Runnable {
+        // The music tab's lock holds the panel open. Checked when the timer
+        // fires rather than when it is armed: the lock is flipped from inside
+        // the open panel, so arming already happened by the time it is on.
+        if (held()) { armClose(); return@Runnable }
         if (opened != null && SystemClock.uptimeMillis() - lastTouch >= CLOSE_MS - 100) { opened = null; refresh() }
     }
+
+    // Whether anything is asking the panel to stay up.
+    //
+    // Only the music page, and only while it is the page that is open. The
+    // lock is for sitting and listening — watching the lyric line change,
+    // keeping an eye on the time left — which is the one thing in the island
+    // that a nine-second timer is actively hostile to, because it is also the
+    // one thing the user is not touching while they do it.
+    //
+    // A pure question. The releasing is done where the page actually changes,
+    // in expand and collapse, so the lock cannot outlive the page it belongs
+    // to: a lock that did would be an island that never closed again, which
+    // looks like a bug rather than a feature. Both conditions are checked
+    // anyway, because the timer firing is the one moment where being wrong
+    // about this would be permanent.
+    private fun held() = opened === music && music.lockOn
 
     private fun armClose() {
         main.removeCallbacks(closePanel)
@@ -472,6 +536,11 @@ class Island(
             main.post { expand(menu) }
         }.also { notch = it }
         if (batteryLevel >= 0) n.battery(batteryLevel, batteryCharging)
+        // The eyes sway while something is playing. Told here rather than from
+        // mediaChanged, because this is the one place that knows the notch
+        // exists at all: a song that started while the phone was upright has
+        // to be in effect the moment it is turned sideways.
+        n.music(prefs.eyeSway && music.playing)
         // The island's hidden landscape silhouette is the notch's block
         // exactly, so a panel that has just closed leaves the right shape
         // sitting on the edge and the notch takes it over instead of growing a
@@ -497,7 +566,7 @@ class Island(
         val o = opened
         if (o != null && o !== home && o !== menu && !o.live() && !o.keepOpen()) opened = null
         val lock = locked
-        val live = scenes.filter { it.live() && !(lock && it.personal) }.sortedByDescending { it.priority }
+        val live = scenes.filter { it.live() && !(lock && it.personal) && prefs.liveOn(it.id) }.sortedByDescending { it.priority }
         // The fullscreen probe goes dark under the lock screen; ignore it there
         val quiet = landscape || (fullscreen && !lock) || hiddenUntil > SystemClock.uptimeMillis() || (lock && !prefs.bool("lockscreen", true))
         val shown = if (quiet) live.filter { it.priority >= URGENT } else live
@@ -752,6 +821,12 @@ class Island(
                 place(rect, true)
             }
         }
+        // A clock or a CPU figure on the resting capsule changes without
+        // anything telling the island about it, so the capsule wakes itself up
+        // on the badge's own pace rather than holding a frame loop open: a
+        // Choreographer callback through four minutes of a still capsule would
+        // be fourteen thousand frames of nothing.
+        if (kind == Kind.Idle) armBadge() else main.removeCallbacks(repaintBadge)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -893,13 +968,22 @@ class Island(
         "shots" -> Icon.Image
         "volume" -> Icon.Volume
         "flag" -> Icon.Spark
+        "maps" -> Icon.Pin
+        "apps" -> Icon.Grid
         else -> Icon.Layers
     }
 
-    // Logo hard left, battery hard right, both inside the capsule with the
-    // same gap on the left, top and bottom. The camera cradle in the middle is
-    // left alone: the marks shrink to fit beside it, and are dropped entirely
-    // rather than drawn too small to read.
+    // Logo hard left, the chosen mark hard right, both inside the capsule with
+    // the same gap on the left, top and bottom. The camera cradle in the
+    // middle is left alone: the marks shrink to fit beside it, and are dropped
+    // entirely rather than drawn too small to read.
+    //
+    // What goes on the right is the user's choice now rather than always the
+    // battery. The slot itself is unchanged whichever is picked — the same
+    // height, the same inset, the same clearance from the lens — so switching
+    // marks never moves the capsule or the logo. "None" is a real choice and
+    // takes exactly that slot and draws nothing in it, which is why the slot
+    // is measured before the badge is consulted.
     private fun drawIdleChrome(c: Canvas, a: Float) {
         val capH = now.height()
         if (capH <= 0f) return
@@ -925,14 +1009,95 @@ class Island(
         val logoL = now.left + inset
         if (logoL + h * Ui.LOGO_ASPECT <= hole.left - ui.s8) {
             box.set(logoL, top, logoL + h * Ui.LOGO_ASPECT, top + h)
-            ui.logo(c, box, ui.ink, a)
+            // The mark takes the theme's accent where there is one. A logo is
+            // the one piece of chrome that is supposed to be the brand's
+            // colour rather than the text's, and on a coloured island a white
+            // one is the only thing on screen that has not been themed.
+            ui.logo(c, box, if (ui.coloured) ui.lead else ui.ink, a)
         }
 
-        val battR = now.right - inset
-        if (batteryLevel >= 0 && battR - ui.batteryWidth(h) >= hole.right + ui.s8) {
-            box.set(battR - ui.batteryWidth(h), top, battR, top + h)
-            ui.battery(c, box, batteryLevel, batteryCharging, a)
+        val badge = Badge.of(prefs)
+        // How fast this badge goes stale, settled before anything is drawn:
+        // the marks that only move when the battery does arrive as a
+        // broadcast and need no timer, while a clock or a CPU figure has to
+        // wake the capsule up on its own.
+        //
+        // Armed from here rather than only from settle(), because settle()
+        // runs when the springs stop and the draw it triggers happens after
+        // it: on the first settle the pace is still zero and the wake would
+        // never be scheduled, so a clock would sit on its opening minute for
+        // ever. Arming here is idempotent — it removes its own callback first.
+        val pace = badges.pace(badge)
+        if (pace != badgePace) {
+            badgePace = pace
+            if (!ticking) armBadge()
         }
+        if (badge == Badge.None) return
+        val right = now.right - inset
+        // The mark badges are laid out in the same slot the battery always
+        // had, so switching between them never shifts the capsule. A text
+        // badge is measured against the real room instead — see below.
+        val slotW = h * Ui.BATTERY_SLOT_ASPECT
+        if (!badge.textual && right - slotW < hole.right + ui.s8) return
+        when (badge) {
+            Badge.Battery -> if (batteryLevel >= 0) {
+                box.set(right - ui.batteryWidth(h), top, right, top + h)
+                ui.battery(c, box, batteryLevel, batteryCharging, a)
+            }
+            // Square, so the ring is a circle rather than an ellipse, and the
+            // square is the slot's height: a ring as wide as a battery shell
+            // would be a hoop
+            Badge.Circle -> if (batteryLevel >= 0) {
+                box.set(right - h, top, right, top + h)
+                ui.batteryRing(c, box, batteryLevel, batteryCharging, a)
+            }
+            Badge.Dot -> if (batteryLevel >= 0) {
+                ui.batteryDot(c, right - h / 2, now.centerY(), h * DOT_R, batteryLevel, batteryCharging, a)
+            }
+            else -> drawBadgeText(c, badge, right, a)
+        }
+    }
+
+    // A textual badge: right-aligned in the slot, ellipsized to whatever room
+    // the capsule actually has.
+    //
+    // The room is the real one — from the lens to the capsule's end — not the
+    // battery's slot, because a name is the one kind of badge that can use
+    // more than a mark's worth of width and the whole point of the carrier and
+    // network badges is that they get longer as the capsule does. The user's
+    // width slider is therefore also the character limit, which is what was
+    // asked for and is also simply what fits.
+    private fun drawBadgeText(c: Canvas, badge: Badge, right: Float, a: Float) {
+        val s = badges.text(badge) ?: return
+        val left = hole.right + ui.s8
+        val room = right - left
+        if (room < ui.dp(16f)) return
+        // One face for every textual badge, with tabular figures so a clock
+        // and a percentage do not shuffle sideways as their digits change
+        ui.textEnd(c, ellipsize(s, room), ui.compact, right, ui.baseline(ui.compact, now.centerY()), a)
+    }
+
+    // Shortened with a trailing ellipsis when it will not fit, which is
+    // TextUtils' own job; it is called out here only because the caller wants
+    // the shortened string rather than to draw it
+    private fun ellipsize(s: String, room: Float): CharSequence =
+        android.text.TextUtils.ellipsize(s, ui.compact, max(0f, room), android.text.TextUtils.TruncateAt.END)
+
+    // How long until the capsule's own mark is worth redrawing. Zero for the
+    // marks that only change when the battery does, since those arrive as a
+    // broadcast; a few seconds for a clock or a CPU figure, which change on
+    // their own and would otherwise sit stale until something else happened.
+    private var badgePace = 0L
+
+    private val repaintBadge = Runnable {
+        if (kind == Kind.Idle) { invalidate(); armBadge() }
+    }
+
+    private fun armBadge() {
+        main.removeCallbacks(repaintBadge)
+        val pace = badgePace
+        if (pace <= 0L || kind != Kind.Idle) return
+        main.postDelayed(repaintBadge, pace)
     }
 
     // Left and right of the camera inside the neck
@@ -1117,8 +1282,16 @@ class Island(
     }
 
     // Next or previous live scene, Home last
-    // Home, then features that have something to show
-    private fun pages(): List<Scene> = listOf(home) + scenes.filter { it.tab() && !(locked && it.personal) }.sortedBy { it.order }
+    // Home, then features that have something to show.
+    //
+    // Home is never filtered out. Every other page is reached by swiping from
+    // it and the gear in the tab bar lives on it, so an island whose
+    // navigation had been emptied would be an island with nothing behind the
+    // swipe at all — the switch would read as "turn the island off", which is
+    // what the master switch is for. Everything else answers to its own
+    // switch.
+    private fun pages(): List<Scene> = listOf(home) +
+        scenes.filter { it.tab() && prefs.tabOn(it.id) && !(locked && it.personal) }.sortedBy { it.order }
 
     private fun page(dir: Int) {
         val list = pages()
@@ -1181,6 +1354,14 @@ class Island(
 
         // Hidden flag value, used only when the field itself cannot be read
         private const val NO_MOVE_ANIMATION_FALLBACK = 0x00000040
+
+        // The battery dot's radius against the slot's height.
+        //
+        // A third, so it is unmistakably a dot rather than a disc that filled
+        // the slot: the dot badge is the smallest thing on the capsule and the
+        // whole of its job is a colour, so what matters is that it is clearly
+        // a single mark and clearly not a battery.
+        private const val DOT_R = 0.33f
 
         // Public from Android 14. Before that the same switch is a private
         // flag; it is set reflectively, and if that is ever refused the

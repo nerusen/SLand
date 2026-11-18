@@ -18,7 +18,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 // Design tokens and island drawing kit
-class Ui(context: Context) {
+class Ui(context: Context, private val prefs: Prefs? = null) {
     private val res = context.resources
     fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, res.displayMetrics)
     fun sp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, v, res.displayMetrics)
@@ -41,29 +41,116 @@ class Ui(context: Context) {
     val btnH = dp(36f)
     val iconS = dp(18f)
 
-    // Tone.Dark from Tepi Windows
-    val ink = Color.rgb(245, 245, 247)
-    val sub = Color.argb(158, 245, 245, 247)
-    val faint = Color.argb(92, 245, 245, 247)
-    val fill = Color.argb(28, 255, 255, 255)
-    val fillStrong = Color.argb(46, 255, 255, 255)
-    val line = Color.argb(23, 255, 255, 255)
+    // Tone.Dark from Tepi Windows, as the island wore it before themes.
+    //
+    // These are no longer constants: the theme moves them. Everything that
+    // draws reads them per frame already, so a theme change is a reseed and a
+    // repaint rather than a rebuilt kit — the paints below are mutated in
+    // place for the same reason, since scenes hold references to them.
+    //
+    // ink, sub and faint stay white in every theme. A coloured ground is a
+    // ground, not a licence to tint the text on it: the accent has a job and
+    // body copy is not it.
+    var ink = WHITE
+        private set
+    var sub = Color.argb(158, 245, 245, 247)
+        private set
+    var faint = Color.argb(92, 245, 245, 247)
+        private set
+    var fill = Color.argb(28, 255, 255, 255)
+        private set
+    var fillStrong = Color.argb(46, 255, 255, 255)
+        private set
+    var line = Color.argb(23, 255, 255, 255)
+        private set
     // Opaque dark grey, a step up from the island's black. The tab bar sits on
     // the island itself, so a translucent white would read as a smudge against
     // whatever is behind the overlay; this is a flat tone instead.
-    val tray = Color.rgb(34, 34, 36)
+    var tray = Color.rgb(34, 34, 36)
+        private set
+
+    // The island's own ground, and what the theme wants its lead surfaces
+    // painted with. A lead surface is the one thing on a panel meant to be
+    // looked at first: the primary button, the page in use, a lit tile. In a
+    // monochrome theme that is white with black on it, exactly as before; in
+    // a combination theme it is the accent.
+    var back = Color.BLACK
+        private set
+    var lead = WHITE
+        private set
+    var onLead = Color.BLACK
+        private set
+
+    // Whether this theme has an accent at all, for the few places that want
+    // to say something different when it does
+    var coloured = false
+        private set
+
+    var theme: Theme = Theme.all[0]
+        private set
 
     val title = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = ink; textSize = sp(14f); typeface = Typeface.DEFAULT_BOLD }
     val body = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = sub; textSize = sp(12f) }
     val bodyInk = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = ink; textSize = sp(12f) }
     val small = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = faint; textSize = sp(10f); fontFeatureSettings = "tnum" }
     val label = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = ink; textSize = sp(12f); typeface = Typeface.DEFAULT_BOLD }
+    // "Dark" by name but by role: the two paints used on top of a lead
+    // surface. On a monochrome theme that surface is white and these are
+    // black, which is where the names come from; on a combination theme they
+    // follow whatever reads against the accent.
     val bodyDark = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(170, 0, 0, 0); textSize = sp(12f) }
     val labelDark = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK; textSize = sp(12f); typeface = Typeface.DEFAULT_BOLD }
     val compact = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = ink; textSize = sp(12f); typeface = Typeface.DEFAULT_BOLD; fontFeatureSettings = "tnum" }
     val lyric = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = ink; textSize = sp(12.5f); typeface = Typeface.DEFAULT_BOLD }
     val big = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = ink; textSize = sp(26f); typeface = Typeface.DEFAULT_BOLD; fontFeatureSettings = "tnum" }
     val heading = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = ink; textSize = sp(16f); typeface = Typeface.DEFAULT_BOLD }
+
+    init {
+        reseed()
+    }
+
+    // Take the colours from the theme the user has picked.
+    //
+    // Called at build and again whenever the setting changes. The two fill
+    // tiers are the interesting part: a dark theme has nothing to lift off
+    // except itself, so a translucent white is right and is what the island
+    // always used. A theme that names its own tiers has them because its
+    // ground is a colour and white over a colour is a wash rather than a
+    // step — Violet's rows are violet, not violet seen through gauze.
+    fun reseed() {
+        val t = Theme.of(prefs ?: return)
+        apply(t)
+    }
+
+    private fun apply(t: Theme) {
+        theme = t
+        back = t.back
+        coloured = t.coloured
+        lead = t.lead
+        onLead = t.onLead
+        ink = WHITE
+        sub = Color.argb(158, 245, 245, 247)
+        faint = Color.argb(92, 245, 245, 247)
+        fill = if (t.tier != 0) t.tier else Color.argb(28, 255, 255, 255)
+        fillStrong = if (t.lift != 0) t.lift else Color.argb(46, 255, 255, 255)
+        line = Color.argb(23, 255, 255, 255)
+        // The tab bar is a strip lying on the island, so it has to be a step
+        // off it in the same direction the fills go. A theme with its own
+        // tiers uses the upper one; a dark theme keeps the flat grey, which is
+        // lighter than any of them.
+        tray = if (t.lift != 0) t.lift else Color.rgb(34, 34, 36)
+        title.color = ink
+        body.color = sub
+        bodyInk.color = ink
+        small.color = faint
+        label.color = ink
+        compact.color = ink
+        lyric.color = ink
+        big.color = ink
+        heading.color = ink
+        labelDark.color = onLead
+        bodyDark.color = alpha(onLead, 0.67f)
+    }
 
     val solid = Paint(Paint.ANTI_ALIAS_FLAG)
     val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
@@ -194,11 +281,26 @@ class Ui(context: Context) {
 
     fun icon(c: Canvas, i: Icon, cx: Float, cy: Float, size: Float, color: Int, a: Float) = Icons.draw(c, i, cx, cy, size, alpha(color, a))
 
-    // Chip: optional icon, then label; primary is ink-filled
+    // A bitmap stretched to fill a rectangle exactly, square-cornered.
+    //
+    // Not art(): that one centre-crops to preserve the aspect and rounds the
+    // corners, which is right for album covers and wrong for map tiles. A tile
+    // is a square of the world and has to land on its own square of canvas or
+    // the grid does not line up with itself.
+    fun image(c: Canvas, bmp: Bitmap, at: RectF, a: Float) {
+        if (bmp.isRecycled || at.width() <= 0f || at.height() <= 0f) return
+        img.alpha = (255 * a).toInt().coerceIn(0, 255)
+        c.drawBitmap(bmp, null, at, img)
+    }
+
+    // Chip: optional icon, then label; primary is painted with the theme's
+    // lead colour, which is white on a monochrome theme and the accent on a
+    // combination one. The text on it follows: black on a bright lead, white
+    // on a dark one, decided once in Theme rather than guessed here.
     fun button(c: Canvas, r: RectF, text: String, a: Float, primary: Boolean = false, icon: Icon? = null) {
-        fill(c, r, radiusButton, if (primary) ink else fill, a)
+        fill(c, r, radiusButton, if (primary) lead else fill, a)
         val p = if (primary) labelDark else label
-        val fg = if (primary) Color.BLACK else ink
+        val fg = if (primary) onLead else ink
         if (icon == null) { centered(c, text, p, r.centerX(), r.centerY(), r.width() - s16, a); return }
         if (text.isEmpty()) { this.icon(c, icon, r.centerX(), r.centerY(), iconS, fg, a); return }
         val gap = dp(6f)
@@ -219,7 +321,7 @@ class Ui(context: Context) {
         stroke.color = alpha(fill, a * 1.6f)
         c.drawCircle(cx, cy, radius, stroke)
         if (frac <= 0f) return
-        stroke.color = alpha(ink, a)
+        stroke.color = alpha(lead, a)
         tmp.set(cx - radius, cy - radius, cx + radius, cy + radius)
         c.drawArc(tmp, -90f, 360f * frac.coerceIn(0f, 1f), false, stroke)
     }
@@ -267,16 +369,22 @@ class Ui(context: Context) {
     }
 
     fun bolt(c: Canvas, cx: Float, cy: Float, size: Float) {
-        val h = size / 2
-        glyph.reset()
-        glyph.moveTo(cx + h * 0.15f, cy - h)
-        glyph.lineTo(cx - h * 0.55f, cy + h * 0.12f)
-        glyph.lineTo(cx - h * 0.02f, cy + h * 0.12f)
-        glyph.lineTo(cx - h * 0.15f, cy + h)
-        glyph.lineTo(cx + h * 0.55f, cy - h * 0.12f)
-        glyph.lineTo(cx + h * 0.02f, cy - h * 0.12f)
-        glyph.close()
+        bolt(glyph, cx, cy, size)
         c.drawPath(glyph, solid)
+    }
+
+    // The same lightning glyph as a path, for the battery mark that punches it
+    // out of its own fill rather than drawing it on top
+    private fun bolt(out: Path, cx: Float, cy: Float, size: Float) {
+        val h = size / 2
+        out.reset()
+        out.moveTo(cx + h * 0.15f, cy - h)
+        out.lineTo(cx - h * 0.55f, cy + h * 0.12f)
+        out.lineTo(cx - h * 0.02f, cy + h * 0.12f)
+        out.lineTo(cx - h * 0.15f, cy + h)
+        out.lineTo(cx + h * 0.55f, cy - h * 0.12f)
+        out.lineTo(cx + h * 0.02f, cy - h * 0.12f)
+        out.close()
     }
 
     fun dot(c: Canvas, cx: Float, cy: Float, r: Float, color: Int, a: Float) {
@@ -306,6 +414,12 @@ class Ui(context: Context) {
     // Battery, iOS style: rounded shell, nub on the right, fill inside.
     // Level is 0..100; the fill keeps a visible sliver so a nearly empty
     // battery still reads as a battery.
+    //
+    // Charging puts a bolt through it, the way the status bar does. The bolt
+    // is punched out of the fill rather than drawn over it: a white bolt on a
+    // green fill is two marks at the same place and at this size the smaller
+    // one wins and the whole thing reads as a smudge. A hole in the fill reads
+    // as a bolt at any size, because its edge is the contrast.
     fun battery(c: Canvas, at: RectF, level: Int, charging: Boolean, a: Float) {
         if (at.height() <= 0f) return
         val h = at.height()
@@ -336,9 +450,54 @@ class Ui(context: Context) {
         val frac = level.coerceIn(0, 100) / 100f
         val w = max(room * 0.08f, room * frac)
         slot.set(cell.left + inset, cell.top + inset, cell.left + inset + w, cell.bottom - inset)
-        solid.color = alpha(batteryTint(level, charging), a)
         val fr = slot.height() * 0.3f
-        c.drawRoundRect(slot, fr, fr, solid)
+        if (!charging) {
+            solid.color = alpha(batteryTint(level, charging), a)
+            c.drawRoundRect(slot, fr, fr, solid)
+            return
+        }
+        // Charging: the fill with a bolt taken out of it. Both paths are
+        // built in the shape scratch pads, so nothing is allocated per frame.
+        fillA.reset()
+        fillA.addRoundRect(slot, fr, fr, Path.Direction.CW)
+        fillB.reset()
+        bolt(fillB, cell.centerX(), cell.centerY(), cell.height() * BOLT_H)
+        fillA.op(fillB, Path.Op.DIFFERENCE)
+        solid.color = alpha(batteryTint(level, charging), a)
+        c.drawPath(fillA, solid)
+    }
+
+    // Battery, as a ring rather than a shell.
+    //
+    // The arc is the level, swept clockwise from the top, on a grey track that
+    // shows what is missing: a ring that only drew the filled part would be a
+    // crescent of unknown size rather than a gauge. No figure and no per-cent
+    // sign, which is the whole point of picking this over the battery — it is
+    // a glance, not a reading. The colours are the system's own three, so a
+    // green ring means the same thing a green shell did.
+    fun batteryRing(c: Canvas, at: RectF, level: Int, charging: Boolean, a: Float) {
+        val d = min(at.width(), at.height())
+        if (d <= 0f) return
+        val width = max(dp(1.4f), d * RING_W)
+        val radius = (d - width) / 2
+        if (radius <= 0f) return
+        stroke.strokeWidth = width
+        stroke.color = alpha(RING_TRACK, a)
+        c.drawCircle(at.centerX(), at.centerY(), radius, stroke)
+        val frac = level.coerceIn(0, 100) / 100f
+        if (frac <= 0f) return
+        stroke.color = alpha(batteryTint(level, charging), a)
+        tmp.set(at.centerX() - radius, at.centerY() - radius, at.centerX() + radius, at.centerY() + radius)
+        // A full battery is a closed circle, not an arc one degree short of
+        // one: the round cap would leave a visible nick at the top
+        if (frac >= 0.999f) c.drawCircle(at.centerX(), at.centerY(), radius, stroke)
+        else c.drawArc(tmp, -90f, 360f * frac, false, stroke)
+    }
+
+    // Battery as one dot: green, amber or red, and nothing else. The smallest
+    // thing that can still carry the warning.
+    fun batteryDot(c: Canvas, cx: Float, cy: Float, radius: Float, level: Int, charging: Boolean, a: Float) {
+        dot(c, cx, cy, radius, batteryTint(level, charging), a)
     }
 
     // Matches what Android itself signals: green while charging, amber at the
@@ -360,6 +519,8 @@ class Ui(context: Context) {
     }
 
     companion object {
+        private val WHITE = Color.rgb(245, 245, 247)
+
         // System greens, ambers and reds, same family as CallScene's
         private val GREEN = Color.rgb(52, 199, 89)
         private val AMBER = Color.rgb(255, 204, 0)
@@ -369,6 +530,19 @@ class Ui(context: Context) {
         private const val BATTERY_ASPECT = 1.95f
         private const val NUB_GAP = 0.08f
         private const val NUB_W = 0.1f
+
+        // The bolt punched through a charging battery, against the shell's
+        // inner height. Taller than the shell on purpose: the glyph's own
+        // bounding box is wider than the stroke it draws, and a bolt that fits
+        // inside the fill with room to spare reads as a dash.
+        private const val BOLT_H = 1.05f
+
+        // The battery ring: how thick its stroke is against its diameter, and
+        // the grey of the part that is empty. The track is a flat grey rather
+        // than translucent white, so an empty ring reads the same over a
+        // bright wallpaper as over a dark one.
+        private const val RING_W = 0.17f
+        private val RING_TRACK = Color.rgb(104, 104, 110)
 
         // assets/nelsen-logo.svg, normalised to its content bounding box
         private val LOGO = floatArrayOf(

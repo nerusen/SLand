@@ -17,6 +17,11 @@ class Reads : Page() {
             Triple(R.string.radio_names, R.string.reads_radios, "Radios.kt"),
             Triple(R.string.act_shot_perm, R.string.reads_shot, "Capture.kt"),
             Triple(R.string.notch_bar, R.string.reads_notch, "Notch.kt"),
+            Triple(R.string.tab_maps, R.string.reads_maps, "Maps.kt"),
+            Triple(R.string.act_walk, R.string.reads_steps, "Steps.kt"),
+            Triple(R.string.apps_pin, R.string.reads_pins, "Shortcuts.kt"),
+            Triple(R.string.glare_group, R.string.reads_glare, "Glare.kt"),
+            Triple(R.string.badge_title, R.string.reads_badge, "Badge.kt"),
         )) {
             label(getString(title))
             val g = group()

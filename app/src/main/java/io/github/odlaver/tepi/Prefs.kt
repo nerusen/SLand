@@ -94,7 +94,62 @@ class Prefs(context: Context) {
         get() = int("notch.eye", NOTCH_EYE_DEFAULT)
         set(v) = set("notch.eye", v)
 
+    // Whether a tab is offered in the island's navigation at all.
+    //
+    // Per tab rather than one list, so a tab added in a later version arrives
+    // switched on instead of missing: the default is yes and only the ones the
+    // user has turned off are written down. Home is not asked about — it is
+    // the page everything else is reached from, and an island whose navigation
+    // is empty is an island with nothing behind the swipe.
+    fun tabOn(id: String) = id == "home" || bool(tabKey(id), true)
+
+    fun setTab(id: String, on: Boolean) {
+        if (id == "home") return
+        set(tabKey(id), on)
+    }
+
+    // Which notice may put itself up without being asked. The island's live
+    // scenes are the ones that arrive on their own, and this is the user
+    // saying they would rather they did not; the tab switch above is about the
+    // swipe, which is a different want.
+    fun liveOn(id: String) = bool(liveKey(id), true)
+
+    fun setLive(id: String, on: Boolean) = set(liveKey(id), on)
+
+    // Walking distance and the activity block under the map
+    var steps: Boolean
+        get() = bool("maps.steps", true)
+        set(v) = set("maps.steps", v)
+
+    // Height in cm and weight in kg, for the stride the step count is turned
+    // into metres with and the calories that come out of it. Zero means not
+    // said, and the defaults below are used instead.
+    var heightCm: Int
+        get() = int("body.height", HEIGHT_DEFAULT)
+        set(v) = set("body.height", v)
+
+    var weightKg: Int
+        get() = int("body.weight", WEIGHT_DEFAULT)
+        set(v) = set("body.weight", v)
+
+    // Brightness warning: the level it fires at, and whether it fires at all
+    var glareWarn: Boolean
+        get() = bool("glare.warn", true)
+        set(v) = set("glare.warn", v)
+
+    var glareAt: Int
+        get() = int("glare.at", GLARE_DEFAULT)
+        set(v) = set("glare.at", v)
+
+    // The eyes sway while music plays
+    var eyeSway: Boolean
+        get() = bool("eye.sway", true)
+        set(v) = set("eye.sway", v)
+
     companion object {
+        private fun tabKey(id: String) = "tab.$id"
+        private fun liveKey(id: String) = "live.$id"
+
         const val OFFSET_MIN = -8
         const val OFFSET_MAX = 24
 
@@ -131,5 +186,27 @@ class Prefs(context: Context) {
         const val NOTCH_EYE_DEFAULT = 100
         const val NOTCH_EYE_MIN = 60
         const val NOTCH_EYE_MAX = 120
+
+        // Body, for the stride and the calorie figure. An average adult, so a
+        // user who never opens the settings still gets a distance within about
+        // a tenth rather than nothing at all.
+        const val HEIGHT_DEFAULT = 168
+        const val HEIGHT_MIN = 120
+        const val HEIGHT_MAX = 210
+        const val WEIGHT_DEFAULT = 65
+        const val WEIGHT_MIN = 30
+        const val WEIGHT_MAX = 160
+
+        // Where the brightness warning fires, as a percentage of the system's
+        // own range.
+        //
+        // Eighty by default, because that is about where a phone indoors stops
+        // being comfortable and starts being a lamp. The floor is sixty: below
+        // that the warning would fire during ordinary daylight use and become
+        // the thing the user learns to ignore. The ceiling is a hundred, which
+        // is "only at the very top" rather than off — the switch is for off.
+        const val GLARE_DEFAULT = 80
+        const val GLARE_MIN = 60
+        const val GLARE_MAX = 100
     }
 }

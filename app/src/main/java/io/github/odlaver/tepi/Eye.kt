@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.os.SystemClock
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
@@ -60,6 +61,15 @@ class Eye(private val ui: Ui) {
     private val glare = Spring(0f, 0.004f, 260f, 30f)
     // Red tint
     private val red = Spring(0f, 0.004f, 240f, 30f)
+    // Green, for a phone on the cable. Separate from red rather than one
+    // "tint" spring between three colours: the two states are independent —
+    // charging at four per cent is both — and a single spring would have had
+    // to pick one, which is how a charging phone would end up looking angry.
+    private val green = Spring(0f, 0.004f, 240f, 30f)
+    // How far the eyes have taken up the music's sway. A spring rather than a
+    // switch, so the swaying starts and stops with the song instead of
+    // snapping into step with it.
+    private val groove = Spring(0f, 0.004f, 200f, 26f)
 
     private val solid = Paint(Paint.ANTI_ALIAS_FLAG)
     // The happy crescent is filled and then stroked with a round join, which
@@ -73,9 +83,31 @@ class Eye(private val ui: Ui) {
     }
     private val oval = RectF()
     private val path = Path()
+    // The charging glow: a blurred copy of whatever the eyes are, drawn under
+    // them. One paint for both eyes, and the blur is a filter rather than a
+    // second pass, so the cost is a shader rather than a redraw.
+    private val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL_AND_STROKE
+        strokeJoin = Paint.Join.ROUND
+        strokeCap = Paint.Cap.ROUND
+    }
+    private var haloFor = 0f
 
     // Battery, as the two levels Android itself warns at
     private var low = 0
+    // On the cable. Not the same question as low: a phone at four per cent
+    // with a charger in it is charging, and that is what the eyes should say.
+    private var plugged = false
+
+    // Whether something is playing. The eyes sway to it, which is the only
+    // thing the notch can do about music: there is no room out here for a
+    // title, and a title is not what someone watching a video sideways with
+    // a song on wants anyway.
+    private var grooving = false
+
+    // Sway phase, in radians, and the slower one the shape breathes on
+    private var swayPhase = 0f
+    private var pulsePhase = 0f
 
     // The event in charge, and when it hands back
     private var event = Mood.Calm
@@ -87,6 +119,10 @@ class Eye(private val ui: Ui) {
 
     // Slow throb for the critical battery, in radians
     private var phase = 0f
+
+    // And the slow fade the charging glow breathes on, which is its own
+    // because it must keep going while the critical throb is not
+    private var glowPhase = 0f
 
     val mood: Mood get() = when {
         eventUntil > SystemClock.uptimeMillis() -> event
@@ -114,14 +150,24 @@ class Eye(private val ui: Ui) {
     }
 
     // Straight from ACTION_BATTERY_CHANGED. Charging is never angry: a phone
-    // on the cable is not in trouble, whatever the level says.
+    // on the cable is not in trouble, whatever the level says. It is green
+    // instead, which is a different thing said with the same shape — the eyes
+    // keep resting and blinking exactly as they were and only the colour
+    // moves, so a phone put on charge does not change expression, it changes
+    // mood lighting.
     fun battery(level: Int, charging: Boolean) {
+        plugged = charging
         low = when {
             charging || level < 0 -> 0
             level <= CRITICAL -> CRITICAL
             level <= LOW -> LOW
             else -> 0
         }
+    }
+
+    // Something is playing, or it is not. The eyes sway to it.
+    fun music(playing: Boolean) {
+        grooving = playing
     }
 
     // True while still moving
@@ -156,12 +202,32 @@ class Eye(private val ui: Ui) {
         joy.target = if (m == Mood.Happy) 1f else 0f
         glare.target = if (m == Mood.Angry) 1f else 0f
         red.target = if (low > 0) 1f else 0f
+        green.target = if (plugged) 1f else 0f
+        // The sway is held back inside an event. A startled pair of eyes that
+        // is also swaying to the music reads as neither: the fright is two
+        // and a half seconds long and the sway can wait for it.
+        groove.target = if (grooving && m == Mood.Calm) 1f else 0f
 
         var moving = false
-        for (s in arrayOf(lid, size, joy, glare, red)) moving = s.step(dt) or moving
+        for (s in arrayOf(lid, size, joy, glare, red, green, groove)) moving = s.step(dt) or moving
         // The critical level pulses, so it keeps asking for frames
         if (low == CRITICAL) {
-            phase = (phase + dt * THROB_RATE) % (Math.PI.toFloat() * 2)
+            phase = (phase + dt * THROB_RATE) % TWO_PI
+            moving = true
+        }
+        // So does the charging glow, which breathes considerably slower: it is
+        // reassurance rather than a warning, and a fast pulse would read as
+        // one
+        if (plugged || green.value > 0.01f) {
+            glowPhase = (glowPhase + dt * GLOW_RATE) % TWO_PI
+            moving = true
+        }
+        // And so does the sway, which is a continuous motion rather than a
+        // spring settling: two phases, one for the side-to-side and a slower
+        // one for the shape, so the two never line up into a mechanical beat
+        if (groove.value > 0.01f) {
+            swayPhase = (swayPhase + dt * SWAY_RATE) % TWO_PI
+            pulsePhase = (pulsePhase + dt * PULSE_RATE) % TWO_PI
             moving = true
         }
         // A deadline still to come is motion as far as the caller is concerned
@@ -184,25 +250,92 @@ class Eye(private val ui: Ui) {
     // other until the pair reads as one smudge. Air between the two is what is
     // held constant instead, so they slide apart as they curve and back
     // together as they settle.
+    //
+    // While music plays the whole pair rides a path rather than sitting still.
+    // The path is an arc and not a line: eyes that slide left and right along
+    // a rail read as a mechanism, and eyes that rise a little at the ends of
+    // the swing read as a head moving. One sine for the sideways and its own
+    // double for the lift is exactly that arc — the lift completes two cycles
+    // for every one of the sway, so the pair is lowest in the middle and
+    // highest at both ends, which is a shallow smile traced out over a couple
+    // of seconds.
     fun draw(c: Canvas, cx: Float, cy: Float, h: Float, a: Float) {
         if (h <= 0f || a <= 0.01f) return
-        val full = h * size.value.coerceIn(0.5f, 2f)
+        val k = groove.value.coerceIn(0f, 1f)
+        // The size wobble rides the slower phase, and it is deliberately
+        // small: a third of a tenth either way is a pair of eyes breathing
+        // with the beat, and anything more is a pair of eyes being squeezed
+        val beat = if (k > 0.01f) 1f + k * PULSE * sin(pulsePhase.toDouble()).toFloat() else 1f
+        val full = h * size.value.coerceIn(0.5f, 2f) * beat
         val f = form(full)
         // The air is held, so the gap is whatever the shapes are actually as
         // wide as plus that. The stroke counts: it puffs the smile out by half
         // of itself on each side, which is a whole stroke of width between the
         // two eyes.
         val gap = full * f.wide + f.stroke + h * AIR
-        one(c, cx - gap / 2, cy, full, a, f)
-        one(c, cx + gap / 2, cy, full, a, f)
+        var ox = 0f
+        var oy = 0f
+        if (k > 0.01f) {
+            val s = sin(swayPhase.toDouble()).toFloat()
+            ox = h * SWAY_X * k * s
+            // Double frequency, so the lift is a bowl under the swing rather
+            // than a tilt that follows it
+            oy = -h * SWAY_Y * k * sin(2.0 * swayPhase).toFloat()
+        }
+        glow(c, cx + ox, cy + oy, gap, full, a, f)
+        one(c, cx + ox - gap / 2, cy + oy, full, a, f)
+        one(c, cx + ox + gap / 2, cy + oy, full, a, f)
+    }
+
+    // The soft green halo under a charging pair.
+    //
+    // A blurred copy of the same two shapes, drawn first so the eyes sit on
+    // top of their own light rather than inside a wash of it. Its opacity
+    // breathes on a slow phase, which is the whole of the animation: the eyes
+    // themselves do not move, so the glow coming and going is what says the
+    // phone is taking a charge rather than simply being green.
+    //
+    // The blur radius follows the eye's own height, so a notch at the smallest
+    // setting gets a halo in proportion rather than a green smudge the size of
+    // the block.
+    private fun glow(c: Canvas, cx: Float, cy: Float, gap: Float, full: Float, a: Float, f: Shape) {
+        val g = green.value.coerceIn(0f, 1f)
+        if (g <= 0.02f || full <= 0f) return
+        val breathe = GLOW_FLOOR + (1f - GLOW_FLOOR) * (0.5f + 0.5f * sin(glowPhase.toDouble()).toFloat())
+        val strength = g * breathe * GLOW_A * a
+        if (strength <= 0.01f) return
+        val blur = max(ui.dp(1.5f), full * GLOW_BLUR)
+        // The filter is rebuilt only when the radius actually changes, which
+        // is on a size change rather than per frame: a BlurMaskFilter
+         // allocates, and this is called sixty times a second
+        if (abs(blur - haloFor) > 0.5f) {
+            haloFor = blur
+            halo.maskFilter = android.graphics.BlurMaskFilter(blur, android.graphics.BlurMaskFilter.Blur.NORMAL)
+        }
+        halo.color = ui.alpha(GREEN, strength)
+        // Stroked as well as filled, so the halo is a touch larger than the
+        // eye it is behind and shows all the way round rather than only where
+        // the blur spills
+        halo.strokeWidth = max(f.stroke, blur * 0.6f)
+        for (side in intArrayOf(-1, 1)) {
+            shape(cx + side * gap / 2, cy, full, f)
+            c.drawPath(path, halo)
+        }
     }
 
     // How wide a pair is at its widest moment, against the resting height of
     // one eye: the air between them plus the two widest shapes either of them
-    // gets, grown by a startle. The caller needs this to know whether a face
-    // fits where it is going, and working it back out of these constants on
-    // the other side of the call is how the two drift apart.
-    fun pairWidth(h: Float) = h * (AIR + 2f * SPAN * MAX_GROWTH)
+    // gets, grown by a startle, plus the sway the music puts them on. The
+    // caller needs this to know whether a face fits where it is going, and
+    // working it back out of these constants on the other side of the call is
+    // how the two drift apart.
+    //
+    // The sway counts twice over: once because the whole pair slides that far
+    // sideways, and once because the shapes are a little larger at the top of
+    // the beat. Both are small, and both would show as a clipped eye if they
+    // were left out of the budget — which is exactly where a shape that is
+    // only ever nearly too big goes wrong.
+    fun pairWidth(h: Float) = h * (AIR + 2f * SPAN * MAX_GROWTH * (1f + PULSE) + 2f * SWAY_X)
 
     // The shape both eyes are drawn with, worked out once a frame.
     //
@@ -275,32 +408,7 @@ class Eye(private val ui: Ui) {
     // One eye, in whatever shape the moods have settled on. The height passed
     // in is the grown one, so the startle is already in it.
     private fun one(c: Canvas, cx: Float, cy: Float, full: Float, a: Float, f: Shape) {
-        val open = lid.value.coerceIn(0f, 1f)
         val colour = ui.alpha(colour(), a)
-
-        // How far the lid has the shape squeezed towards the eye line.
-        //
-        // A blink is a line, not nothing, so there are two floors under it:
-        // one in the eye's own units and one in dp, because the smallest notch
-        // with the smallest eye in it is a shape only a few dp tall and a
-        // fourteen per cent slice of that is under a pixel. They are applied
-        // here, to the squeeze itself, rather than to the oval alone — the
-        // oval is held inside the curve's band, so a floor the curve did not
-        // also get would simply be clamped back off again.
-        val floor = max(LINE, if (full > 1f) ui.dp(BLINK_FLOOR) / full else LINE)
-        val squeeze = max(floor, open)
-        // The curve, built first because the oval behind it is measured
-        // against it. Two quadratics bowing away from each other, the far one
-        // further than the near one, so the shape is fat in the middle and
-        // runs out towards its two ends. At rest the two bow by exactly the
-        // oval's half-height and the shape is the oval itself; bowed down with
-        // its ends swept up it is the devil's scowl; bowed up with its ends
-        // dipped and drawn plump it is the smile. The whole thing is squeezed
-        // towards the eye line by the lid, so a glare can still blink.
-        val half = full * f.wide / 2
-        val tip = cy + full * f.tip * squeeze
-        val upper = cy + full * f.up * squeeze
-        val lower = cy + full * f.lo * squeeze
 
         if (f.rest > 0.01f) {
             // The resting oval, held inside the curve's own band and centred
@@ -311,11 +419,14 @@ class Eye(private val ui: Ui) {
             // dropping it at the hand-over would be the shape jumping down a
             // fifth of its height in one frame, which is the flicker this is
             // all here to get rid of. Inside the band, the hand-over is
-            // invisible. The blink's floors are in the squeeze above rather
-            // than here, so the band carries them too.
+            // invisible. The blink's floors are in the squeeze rather than
+            // here, so the band carries them too.
             //
             // A quadratic sits halfway between its control point and the
             // chord, so the band is those two midpoints.
+            val tip = tipOf(cy, full, f)
+            val upper = upperOf(cy, full, f)
+            val lower = lowerOf(cy, full, f)
             val top = min(tip, (tip + upper) / 2)
             val bottom = max(tip, (tip + lower) / 2)
             val mid = (top + bottom) / 2
@@ -326,11 +437,7 @@ class Eye(private val ui: Ui) {
             c.drawOval(oval, solid)
         }
 
-        path.reset()
-        path.moveTo(cx - half, tip)
-        path.quadTo(cx, upper, cx + half, tip)
-        path.quadTo(cx, lower, cx - half, tip)
-        path.close()
+        shape(cx, cy, full, f)
         // Filled and then stroked with a round join, which rounds the two ends
         // and puffs the shape out by half a stroke on each side: the difference
         // between a cute curve and a sharp one. It comes in with the smile, so
@@ -342,20 +449,71 @@ class Eye(private val ui: Ui) {
         c.drawPath(path, p)
     }
 
-    // White at rest, red as the battery goes. The critical level breathes
-    // between full and most of full, which is the difference between a warning
-    // that is on and one that is urgent.
+    // The eye's outline, into the shared path.
+    //
+    // Pulled out of one() so the charging halo can draw the same silhouette
+    // blurred underneath without a second copy of the construction: two
+    // quadratics bowing away from each other, the far one further than the
+    // near one, so the shape is fat in the middle and runs out towards its two
+    // ends. At rest the two bow by exactly the oval's half-height and the
+    // shape is the oval itself; bowed down with its ends swept up it is the
+    // devil's scowl; bowed up with its ends dipped and drawn plump it is the
+    // smile. The whole thing is squeezed towards the eye line by the lid, so a
+    // glare can still blink.
+    private fun shape(cx: Float, cy: Float, full: Float, f: Shape) {
+        val half = full * f.wide / 2
+        val tip = tipOf(cy, full, f)
+        path.reset()
+        path.moveTo(cx - half, tip)
+        path.quadTo(cx, upperOf(cy, full, f), cx + half, tip)
+        path.quadTo(cx, lowerOf(cy, full, f), cx - half, tip)
+        path.close()
+    }
+
+    // How far the lid has the shape squeezed towards the eye line.
+    //
+    // A blink is a line, not nothing, so there are two floors under it: one in
+    // the eye's own units and one in dp, because the smallest notch with the
+    // smallest eye in it is a shape only a few dp tall and a fourteen per cent
+    // slice of that is under a pixel. They are applied to the squeeze itself
+    // rather than to the oval alone — the oval is held inside the curve's
+    // band, so a floor the curve did not also get would simply be clamped back
+    // off again.
+    private fun squeezeOf(full: Float): Float {
+        val open = lid.value.coerceIn(0f, 1f)
+        val floor = max(LINE, if (full > 1f) ui.dp(BLINK_FLOOR) / full else LINE)
+        return max(floor, open)
+    }
+
+    private fun tipOf(cy: Float, full: Float, f: Shape) = cy + full * f.tip * squeezeOf(full)
+    private fun upperOf(cy: Float, full: Float, f: Shape) = cy + full * f.up * squeezeOf(full)
+    private fun lowerOf(cy: Float, full: Float, f: Shape) = cy + full * f.lo * squeezeOf(full)
+
+    // White at rest, red as the battery goes, green on the cable. The critical
+    // level breathes between full and most of full, which is the difference
+    // between a warning that is on and one that is urgent.
+    //
+    // Red wins over green where both somehow apply, but they cannot: battery()
+    // clears low whenever the charger is in, which is the right way round —
+    // a phone at four per cent that is charging is a phone that is fine.
     private fun colour(): Int {
         val t = red.value.coerceIn(0f, 1f)
-        if (t <= 0.01f) return ui.ink
-        val pulse = if (low == CRITICAL) 0.78f + 0.22f * (0.5f + 0.5f * sin(phase.toDouble()).toFloat()) else 1f
-        val mix = min(1f, t * pulse)
-        return Color.rgb(
-            lerp(Color.red(ui.ink), Color.red(RED), mix),
-            lerp(Color.green(ui.ink), Color.green(RED), mix),
-            lerp(Color.blue(ui.ink), Color.blue(RED), mix),
-        )
+        val g = green.value.coerceIn(0f, 1f)
+        if (t <= 0.01f && g <= 0.01f) return ui.ink
+        if (t > g) {
+            val pulse = if (low == CRITICAL) 0.78f + 0.22f * (0.5f + 0.5f * sin(phase.toDouble()).toFloat()) else 1f
+            return mix(ui.ink, RED, min(1f, t * pulse))
+        }
+        // Green holds steady; it is the halo behind it that breathes, so the
+        // eyes themselves do not flicker while the phone charges
+        return mix(ui.ink, GREEN, g)
     }
+
+    private fun mix(from: Int, to: Int, k: Float) = Color.rgb(
+        lerp(Color.red(from), Color.red(to), k),
+        lerp(Color.green(from), Color.green(to), k),
+        lerp(Color.blue(from), Color.blue(to), k),
+    )
 
     private fun lerp(from: Int, to: Int, k: Float) = (from + (to - from) * k).toInt().coerceIn(0, 255)
 
@@ -372,6 +530,30 @@ class Eye(private val ui: Ui) {
     }
 
     companion object {
+        // The sway, while music plays, declared first because the size
+        // budgets below are worked out from it.
+        //
+        // SWAY_X is how far the pair slides either side of centre, against the
+        // resting height of one eye, and SWAY_Y is the lift at the ends of the
+        // swing. The lift is a quarter of the slide and runs at twice its
+        // frequency, which is what bends the path into a shallow arc instead
+        // of a rail: the pair is lowest in the middle of the swing and highest
+        // at both ends. RATE is a little over one full swing every two
+        // seconds, which is unhurried enough to read as a sway rather than a
+        // jitter, and PULSE_RATE is deliberately not a multiple of it so the
+        // size wobble drifts against the slide instead of marching with it.
+        //
+        // PULSE is how much the shapes themselves grow and shrink on that
+        // slower phase: three per cent, which is the difference between eyes
+        // that are alive to the music and eyes being pumped. It is small on
+        // purpose — the thing being avoided is a face that looks like it is
+        // chewing.
+        private const val SWAY_X = 0.3f
+        private const val SWAY_Y = 0.075f
+        private const val SWAY_RATE = 3.1f
+        private const val PULSE_RATE = 4.3f
+        private const val PULSE = 0.03f
+
         // The most the eye ever grows past its resting height, which is the
         // startle, and the tallest the drawn shape gets against that grown
         // height. Both are public because whoever hands draw() a height has to
@@ -381,9 +563,15 @@ class Eye(private val ui: Ui) {
         // EXTENT is over 1 because the crescents are not inside the oval: the
         // scowl's floor bows to half of DEVIL_FLOOR below the eye line, which
         // is further down than the oval's own edge, and that is the lowest
-        // point anything here reaches.
+        // point anything here reaches. The sway's lift and the beat's growth
+        // are both in it too, for the same reason they are in pairWidth: a
+        // budget that only covers the still face is a budget that clips the
+        // moving one. It works out at 1.10 x (1 + PULSE) + SWAY_Y; the number
+        // is written out so the budget cannot silently move when one of those
+        // two is tuned, which is exactly the kind of change that would start
+        // clipping an eye on one phone and not another.
         const val MAX_GROWTH = 1.32f
-        const val MAX_EXTENT = 1.10f
+        const val MAX_EXTENT = 1.208f
 
         // Oval width over its height: taller than wide, the way Tepi's own
         // pair are drawn in the app
@@ -462,7 +650,29 @@ class Eye(private val ui: Ui) {
         // Radians per second of the critical throb: about one breath a second
         private const val THROB_RATE = 6.2f
 
-        // Same red the battery mark uses at its critical level
+        // The charging glow.
+        //
+        // RATE is deliberately a third of the critical throb: the one is a
+        // warning and should feel like a pulse, the other is reassurance and
+        // should feel like breathing. FLOOR keeps the halo from going out
+        // entirely at the bottom of the breath — a glow that reaches zero
+        // reads as a flash rather than a fade. BLUR is against the eye's own
+        // height so a small notch gets a small halo, and A is how bright the
+        // whole thing is allowed to get, which is well under the eye in front
+        // of it: a halo as bright as its source is not a halo.
+        private const val GLOW_RATE = 2.1f
+        private const val GLOW_FLOOR = 0.32f
+        private const val GLOW_BLUR = 0.42f
+        private const val GLOW_A = 0.72f
+
+        // One turn, for wrapping the phases. Written out rather than derived
+        // from Math.PI, because a const val may only hold a compile-time
+        // constant and a conversion to Float is a call.
+        private const val TWO_PI = 6.2831855f
+
+        // Same red the battery mark uses at its critical level, and the same
+        // green it uses while charging
         private val RED = Color.rgb(255, 69, 58)
+        private val GREEN = Color.rgb(52, 199, 89)
     }
 }

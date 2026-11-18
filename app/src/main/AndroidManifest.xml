@@ -17,6 +17,24 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <!--
+      The Maps tab: where the phone is, and how far it has walked today.
+
+      Location is already asked for above, for the Wi-Fi name, and the map
+      uses the same grant. The step counter needs its own: ACTIVITY_RECOGNITION
+      is what reads the hardware pedometer, which is the only way to know a
+      day's total rather than only the part Tepi was watching. Both are
+      optional — without them the tab says which is missing and nothing else
+      changes.
+    -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-feature
+        android:name="android.hardware.sensor.stepcounter"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.location.gps"
+        android:required="false" />
+
+    <!--
       The screenshot card. Android has no "a screenshot was taken" signal for
       other apps, so the gallery is watched for a new image in a Screenshots
       folder; that read is what these allow. Optional: without them the card
@@ -92,6 +110,11 @@
 
         <activity
             android:name=".Apps"
+            android:exported="false" />
+
+        <!-- Choosing which apps are pinned to the island -->
+        <activity
+            android:name=".Pins"
             android:exported="false" />
 
         <activity

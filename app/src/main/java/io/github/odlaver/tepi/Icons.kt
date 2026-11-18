@@ -12,7 +12,7 @@ enum class Icon {
     Play, Pause, Next, Prev, Stop, Plus, Check, Close, Timer, Note, Gear, Home, Hide, Copy, Share, Open, Reply,
     Flag, Music, Lyrics, Bell, Moon, Drop, Eye, Stretch, Bolt, Phone, Headphones, Download, Nav, Camera, Shield,
     Book, Tasks, Shelf, Info, Code, User, Battery, Layers, Hand, Power, Chat, Link, Pin, Trash, Laptop, Globe, Coffee, Chevron, Spark,
-    Wifi, Bluetooth, Github, Volume, Mute, Image, Flash, Hotspot, Plane, Leaf, BellOff
+    Wifi, Bluetooth, Github, Volume, Mute, Image, Flash, Hotspot, Plane, Leaf, BellOff, Lock, Grid, Palette, Signal
 }
 
 // Line icons on a 24-unit grid, drawn with the Ink stroke
@@ -194,6 +194,55 @@ object Icons {
                 c.drawPath(path, p)
                 ln(c, 10f, 20.5f, 14f, 20.5f)
                 ln(c, 4f, 3.5f, 20f, 20.5f)
+            }
+            // Padlock, shut: the body as a rounded box and the shackle as an
+            // arch on top of it
+            Icon.Lock -> {
+                rr(c, 5f, 10.5f, 19f, 20.5f, 2.5f)
+                path.reset()
+                path.moveTo(8.5f, 10.5f)
+                path.lineTo(8.5f, 8f)
+                path.quadTo(8.5f, 3.5f, 12f, 3.5f)
+                path.quadTo(15.5f, 3.5f, 15.5f, 8f)
+                path.lineTo(15.5f, 10.5f)
+                c.drawPath(path, p)
+                fill(); c.drawCircle(12f, 15.5f, 1.6f, p)
+            }
+            // Nine squares: the mark for a grid of apps
+            Icon.Grid -> {
+                for (row in 0 until 3) for (col in 0 until 3) {
+                    val x = 4.5f + col * 5.25f
+                    val y = 4.5f + row * 5.25f
+                    rr(c, x, y, x + 3.5f, y + 3.5f, 1f)
+                }
+            }
+            // An artist's palette: the blob with a thumb hole and three wells
+            Icon.Palette -> {
+                path.reset()
+                path.moveTo(12f, 3.5f)
+                path.cubicTo(17.5f, 3.5f, 21f, 7f, 21f, 11.5f)
+                path.cubicTo(21f, 15f, 18f, 15.5f, 16f, 15.5f)
+                path.cubicTo(14.5f, 15.5f, 13.5f, 16.5f, 13.5f, 18f)
+                path.cubicTo(13.5f, 19.5f, 12.5f, 20.5f, 11f, 20.5f)
+                path.cubicTo(6.5f, 20.5f, 3f, 16.5f, 3f, 12f)
+                path.cubicTo(3f, 7f, 6.5f, 3.5f, 12f, 3.5f)
+                c.drawPath(path, p)
+                fill()
+                c.drawCircle(8f, 9f, 1.4f, p)
+                c.drawCircle(12.5f, 7.5f, 1.4f, p)
+                c.drawCircle(16.5f, 10f, 1.4f, p)
+            }
+            // Four climbing bars, the way a phone shows cellular signal. This
+            // is mobile data rather than the hotspot that shares it, and the
+            // two are different things: one is the radio, the other is giving
+            // it away.
+            Icon.Signal -> {
+                fill()
+                var x = 4f
+                for (h in floatArrayOf(5f, 8.5f, 12f, 15.5f)) {
+                    rr(c, x, 19.5f - h, x + 3.2f, 19.5f, 1f)
+                    x += 4.6f
+                }
             }
         }
         line()

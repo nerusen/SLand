@@ -36,6 +36,28 @@ class MusicScene(host: Host, private val media: Media, private val prefs: Prefs,
     private val hitNext = RectF()
     private val hitBar = RectF()
     private val hitInfo = RectF()
+    private val hitLock = RectF()
+
+    // The panel's nine-second timer, switched off.
+    //
+    // Every other page in the island is somewhere the user goes to do a thing
+    // and then leaves, which is what the timer is for: a panel that stayed up
+    // would be a panel in the way. Music is the exception, and it is the
+    // exception precisely because of how the timer works — the timer is reset
+    // by touching the island, and listening to a song is the one activity
+    // where the user is deliberately not touching anything. Watching the lyric
+    // line change or the time run down is the whole of what they are doing,
+    // and the panel closing under them every nine seconds makes it impossible.
+    //
+    // It releases itself on a page change rather than needing to be turned
+    // off. A lock is a thing people forget, and a lock that outlived the page
+    // it belongs to would be an island that never closed again — which looks
+    // like a bug, not a feature. So the island asks this page whether it is
+    // still holding, and moving away is the answer being no.
+    var lockOn = false
+        private set
+
+    fun unlock() { lockOn = false }
 
     val playing get() = media.playing
     val track get() = media.track
@@ -195,9 +217,19 @@ class MusicScene(host: Host, private val media: Media, private val prefs: Prefs,
         tmp.set(r.left, r.top, r.left + art, r.top + art)
         ui.art(c, tr.art, tmp, a)
         val tx = r.left + art + ui.s12
-        hitInfo.set(r.left, r.top, r.right, r.top + art)
-        ui.text(c, tr.title, ui.title, tx, r.top + ui.dp(20f), r.right - tx, a)
-        if (tr.artist.isNotEmpty()) ui.text(c, tr.artist, ui.body, tx, r.top + ui.dp(38f), r.right - tx, a)
+        // The lock sits at the top right, where nothing else is: the title row
+        // runs out before it and the transport controls are centred far below.
+        // Its own button rather than a line in a menu, because what it is for
+        // is being reached while a song is already playing.
+        val lb = ui.dp(32f)
+        hitLock.set(r.right - lb, r.top + (art - lb) / 2, r.right, r.top + (art + lb) / 2)
+        ui.fill(c, hitLock, lb / 2, if (lockOn) ui.lead else ui.fill, a)
+        ui.icon(c, io.github.odlaver.tepi.Icon.Lock, hitLock.centerX(), hitLock.centerY(), ui.dp(16f),
+            if (lockOn) ui.onLead else ui.sub, a)
+        hitInfo.set(r.left, r.top, hitLock.left - ui.s8, r.top + art)
+        val tw = hitLock.left - ui.s8 - tx
+        ui.text(c, tr.title, ui.title, tx, r.top + ui.dp(20f), tw, a)
+        if (tr.artist.isNotEmpty()) ui.text(c, tr.artist, ui.body, tx, r.top + ui.dp(38f), tw, a)
 
         val barY = r.top + art + ui.dp(16f)
         val dur = tr.durationMs
@@ -242,6 +274,13 @@ class MusicScene(host: Host, private val media: Media, private val prefs: Prefs,
             return true
         }
         when {
+            hitLock.contains(x, y) -> {
+                lockOn = !lockOn
+                // The island re-arms its timer on every tap, so turning the
+                // lock off leaves nine seconds on the clock rather than
+                // closing the panel out from under the finger that did it
+                host.refresh()
+            }
             hitPlay.contains(x, y) -> media.toggle()
             hitPrev.contains(x, y) -> media.prev()
             hitNext.contains(x, y) -> media.next()
