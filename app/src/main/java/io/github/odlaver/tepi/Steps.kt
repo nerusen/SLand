@@ -144,11 +144,12 @@ class Steps(private val context: Context, private val prefs: Prefs, private val 
         started = true
         activeMin = prefs.int(ACTIVE, 0)
         if (!canCount()) return
-        val s = try { sensors?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) } catch (_: Exception) { null } ?: return
+        val sm = sensors ?: return
+        val s = try { sm.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) } catch (_: Exception) { null } ?: return
         // The slowest rate there is. The counter is a running total, so a
         // reading every few seconds is as good as a reading per step and the
         // sensor hub batches them either way.
-        try { sensors.registerListener(counter, s, SensorManager.SENSOR_DELAY_NORMAL, BATCH_US) } catch (_: Exception) { }
+        try { sm.registerListener(counter, s, SensorManager.SENSOR_DELAY_NORMAL, BATCH_US) } catch (_: Exception) { }
     }
 
     fun stop() {
@@ -171,20 +172,27 @@ class Steps(private val context: Context, private val prefs: Prefs, private val 
             return
         }
         if (!canLocate()) { locating = false; return }
+        val lm = locations
+        if (lm == null) { locating = false; return }
         // Last known position first, so the map has somewhere to be while the
         // first real fix is still being worked out
         try {
             for (p in listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)) {
-                val last = locations?.getLastKnownLocation(p) ?: continue
+                val last = lm.getLastKnownLocation(p) ?: continue
                 if (here == null || last.time > (here?.time ?: 0L)) here = last
             }
         } catch (_: Exception) { }
+        // The fused provider where there is one: it is the system's own blend
+        // of GPS, Wi-Fi and the sensors, and it reaches a usable fix indoors
+        // where bare GPS does not. Both of the older providers otherwise,
+        // because either on its own leaves a gap — GPS has nothing indoors and
+        // the network provider is never accurate enough to trust a distance to.
         try {
-            if (Build.VERSION.SDK_INT >= 31 && locations?.isProviderEnabled(LocationManager.FUSED_PROVIDER) == true) {
-                locations.requestLocationUpdates(LocationManager.FUSED_PROVIDER, FIX_MS, FIX_M, fixes, Looper.getMainLooper())
+            if (Build.VERSION.SDK_INT >= 31 && lm.isProviderEnabled(LocationManager.FUSED_PROVIDER)) {
+                lm.requestLocationUpdates(LocationManager.FUSED_PROVIDER, FIX_MS, FIX_M, fixes, Looper.getMainLooper())
             } else {
-                locations?.requestLocationUpdates(LocationManager.GPS_PROVIDER, FIX_MS, FIX_M, fixes, Looper.getMainLooper())
-                locations?.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, FIX_MS, FIX_M, fixes, Looper.getMainLooper())
+                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, FIX_MS, FIX_M, fixes, Looper.getMainLooper())
+                lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, FIX_MS, FIX_M, fixes, Looper.getMainLooper())
             }
         } catch (_: Exception) { locating = false }
         changed()
@@ -248,20 +256,25 @@ class Steps(private val context: Context, private val prefs: Prefs, private val 
     // tab is first opened rather than after the next step.
     fun poke() {
         if (!started || !canCount()) return
-        val s = try { sensors?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) } catch (_: Exception) { null } ?: return
+        val sm = sensors ?: return
+        val sensor = try { sm.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) } catch (_: Exception) { null } ?: return
         // A one-shot registration at the fastest rate delivers the current
-        // total almost immediately, and is unregistered again by the listener
-        // below. Cheaper than keeping a fast listener open, and the only way
+        // total almost immediately, and unregisters itself as soon as it
+        // arrives. Cheaper than keeping a fast listener open, and the only way
         // to ask a cumulative sensor for its value on demand.
+        //
+        // The timeout is the other half of it: a sensor that never fires would
+        // otherwise leave a fast listener registered for the life of the
+        // service, which is exactly the battery cost this is avoiding.
         val once = object : SensorEventListener {
             override fun onSensorChanged(e: SensorEvent) {
                 e.values.firstOrNull()?.let { note(it.toLong()) }
-                try { sensors.unregisterListener(this) } catch (_: Exception) { }
+                try { sm.unregisterListener(this) } catch (_: Exception) { }
             }
-            override fun onAccuracyChanged(s: Sensor?, acc: Int) = Unit
+            override fun onAccuracyChanged(sensor: Sensor?, acc: Int) = Unit
         }
-        try { sensors.registerListener(once, s, SensorManager.SENSOR_DELAY_FASTEST) } catch (_: Exception) { }
-        main.postDelayed({ try { sensors.unregisterListener(once) } catch (_: Exception) { } }, 2000)
+        try { sm.registerListener(once, sensor, SensorManager.SENSOR_DELAY_FASTEST) } catch (_: Exception) { }
+        main.postDelayed({ try { sm.unregisterListener(once) } catch (_: Exception) { } }, POKE_MS)
     }
 
     companion object {
@@ -278,6 +291,10 @@ class Steps(private val context: Context, private val prefs: Prefs, private val 
         // together, which is the difference between a sensor that costs
         // nothing and one that wakes the main core every few seconds
         private const val BATCH_US = 60_000_000
+
+        // How long the one-shot reading in poke() is given before its
+        // listener is taken down regardless
+        private const val POKE_MS = 2000L
 
         // Fixes: no faster than this, and no closer together than this
         private const val FIX_MS = 3000L

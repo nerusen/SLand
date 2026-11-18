@@ -119,10 +119,14 @@ class Ui(context: Context, private val prefs: Prefs? = null) {
     // step — Violet's rows are violet, not violet seen through gauze.
     fun reseed() {
         val t = Theme.of(prefs ?: return)
-        apply(t)
+        adopt(t)
     }
 
-    private fun apply(t: Theme) {
+    // Deliberately not called apply(). A member named apply shadows Kotlin's
+    // own scope function for every call inside this class, and this class is
+    // built almost entirely out of `Paint(...).apply { }` — the paints above
+    // would stop compiling, and not at this line.
+    private fun adopt(t: Theme) {
         theme = t
         back = t.back
         coloured = t.coloured

@@ -6,6 +6,7 @@ import android.graphics.RectF
 import android.os.SystemClock
 import io.github.odlaver.tepi.Icon
 import io.github.odlaver.tepi.Maps
+import io.github.odlaver.tepi.Prefs
 import io.github.odlaver.tepi.R
 import io.github.odlaver.tepi.Steps
 import kotlin.math.abs
@@ -30,7 +31,7 @@ class MapsTab(
     host: Host,
     private val maps: Maps,
     private val steps: Steps,
-    private val prefs: io.github.odlaver.tepi.Prefs,
+    private val prefs: Prefs,
     private val settings: () -> Unit,
     private val grant: () -> Unit,
 ) : TabScene(host) {
@@ -113,6 +114,27 @@ class MapsTab(
         ), a)
     }
 
+    // The position, handed to whatever map app the phone has.
+    //
+    // A geo: URI with a q of the same coordinates, not just the coordinates.
+    // geo:lat,lon alone centres the map there and marks nothing, which looks
+    // like the app opened on the wrong screen; the q parameter is what puts a
+    // pin on the spot, and every map app on Android understands it. The zoom
+    // is carried across too, so the app opens at the scale that was being
+    // looked at rather than at its own default.
+    //
+    // With no fix yet there is nothing to point at, so this falls back to the
+    // map app's own idea of where it is: geo:0,0 is the documented way of
+    // saying "open, I have no opinion".
+    private fun openHere(): android.content.Intent {
+        val loc = steps.here
+        val uri = if (loc == null) "geo:0,0"
+        else "geo:%f,%f?q=%f,%f&z=%d".format(
+            java.util.Locale.US, loc.latitude, loc.longitude, loc.latitude, loc.longitude, zoom,
+        )
+        return android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(uri))
+    }
+
     // The basemap, the dot, the scale and the credit.
     //
     // The grid is worked out from the centre outwards: the tile the centre
@@ -185,8 +207,15 @@ class MapsTab(
         hitOut.set(hitIn.left, hitIn.bottom + ui.s4, hitIn.right, hitIn.bottom + ui.s4 + bs)
         zoomButton(c, hitIn, true, zoom < ZOOM_MAX, a)
         zoomButton(c, hitOut, false, zoom > ZOOM_MIN, a)
-        hits.add(RectF(hitIn) to { if (zoom < ZOOM_MAX) zoom++ })
-        hits.add(RectF(hitOut) to { if (zoom > ZOOM_MIN) zoom-- })
+        // The clamp is here rather than in the lambda so these stay () -> Unit:
+        // an increment is an expression and a lambda whose last statement is
+        // one has that as its return type, which does not fit the hit list.
+        hits.add(RectF(hitIn) to { zoomBy(1) })
+        hits.add(RectF(hitOut) to { zoomBy(-1) })
+    }
+
+    private fun zoomBy(step: Int) {
+        zoom = (zoom + step).coerceIn(ZOOM_MIN, ZOOM_MAX)
     }
 
     private fun zoomButton(c: Canvas, at: RectF, plus: Boolean, on: Boolean, a: Float) {
@@ -215,8 +244,10 @@ class MapsTab(
         c.drawLine(x, y, x + px, y, ui.stroke)
         c.drawLine(x, y - ui.dp(3f), x, y + ui.dp(3f), ui.stroke)
         c.drawLine(x + px, y - ui.dp(3f), x + px, y + ui.dp(3f), ui.stroke)
+        // NICE holds whole metres, so the kilometre label is the only one that
+        // needs a decimal and the metre one is already an Int
         val label = if (metres >= 1000) host.ctx.getString(R.string.n_km, fmt(metres / 1000.0))
-        else host.ctx.getString(R.string.n_m, metres.roundToInt())
+        else host.ctx.getString(R.string.n_m, metres)
         ui.text(c, label, ui.small, x, y - ui.dp(6f), px * 2, a)
     }
 
@@ -310,10 +341,5 @@ class MapsTab(
 
         // Round numbers a scale bar may be, in metres
         private val NICE = listOf(10, 20, 50, 100, 200, 500, 1000, 2000, 5000)
-
-        // No draw for this long and the page is not on screen any more, so the
-        // fixes stop. Four seconds rather than one: a page being swiped
-        // through should not drop and re-acquire GPS on the way past.
-        private const val IDLE_MS = 4000L
     }
 }
