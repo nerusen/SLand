@@ -174,7 +174,7 @@
     <string name="shelf_too_big">Too big for the shelf (max 25 MB)</string>
     <string name="shelf_failed">Nothing to save</string>
     <string name="save_to_tepi">Save to Tepi</string>
-    <string name="shortcut_focus">Focus 25</string>
+    <string name="shortcut_focus">Focus 30</string>
     <string name="shortcut_note">New note</string>
     <string name="b_audio">Connected</string>
     <string name="cd_cam">Camera in use</string>
@@ -467,6 +467,7 @@
     <string name="tabs_notices">Notices</string>
     <string name="tabs_home_always">Always on. Every other page is reached by swiping from Home, and the settings gear lives on its bar.</string>
     <string name="tabs_note">A page with nothing to show is left out of the swipe by itself, so a switch here is for the pages you never want rather than the ones that happen to be empty.</string>
+    <string name="tabs_limit">Navigation supports up to 7 active tabs besides Home and Settings. Turn off one tab to enable another.</string>
 
     <!-- The resting capsule's right-hand mark -->
     <string name="badge_title">Capsule mark</string>

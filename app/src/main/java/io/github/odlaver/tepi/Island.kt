@@ -150,6 +150,7 @@ class Island(
     private val now = RectF()
     private val target = RectF()
     private val bubble = RectF()
+    private val lyricBubble = RectF()
 
     // State
     private var kind = Kind.Hidden
@@ -661,15 +662,10 @@ class Island(
             }
             Kind.Compact -> {
                 val pillW = compactWidth(primary)
-                val row = primary?.rowWidth() ?: 0f
-                if (row > 0f) {
-                    w = row.coerceIn(min(pillW, wide), wide)
-                    bottom = statusBottom + ui.dp(32f)
-                    nk = pillW; sy = statusBottom; rb = ui.dp(18f)
-                } else {
-                    w = min(pillW, wide); bottom = pill.bottom
-                    nk = w; sy = pill.top
-                }
+                w = min(pillW, wide)
+                bottom = pill.bottom
+                nk = w
+                sy = pill.top
             }
             Kind.Panel -> {
                 w = wide
@@ -711,9 +707,16 @@ class Island(
 
         midX.target = cx; wid.target = w; t.target = target.top; b.target = target.bottom
         neck.target = nk; split.target = sy; rad.target = rt; radB.target = rb
-        bubbleK.target = if (second != null) 1f else 0f
+        bubbleK.target = if (second != null || (primary?.id == "music" && (primary?.rowWidth() ?: 0f) > 0f)) 1f else 0f
         val d = pill.height()
         bubble.set(target.right + ui.s8, pill.top, target.right + ui.s8 + d, pill.bottom)
+        lyricBubble.setEmpty()
+        val lyricW = if (primary?.id == "music") primary?.rowWidth() ?: 0f else 0f
+        if (lyricW > 0f) {
+            val lyricLeft = if (second != null) bubble.right + ui.s8 else target.right + ui.s8
+            val lyricRight = min(span, lyricLeft + lyricW)
+            lyricBubble.set(lyricLeft, pill.top, lyricRight, pill.bottom)
+        }
 
         wantedKey = "$kind:${primary?.id}"
         if (wantedKey != shownKey) contentA.target = 0f
@@ -725,6 +728,7 @@ class Island(
         val union = RectF(target)
         union.union(midX.value - wid.value / 2, t.value, midX.value + wid.value / 2, b.value)
         if (second != null || bubbleK.value > 0.01f) union.union(bubble)
+        if (!lyricBubble.isEmpty) union.union(lyricBubble)
         place(union, wantsTouch())
         kick()
     }
@@ -838,7 +842,10 @@ class Island(
         canvas.translate(-loc[0].toFloat(), -loc[1].toFloat())
         buildShape(shape)
         val k = bubbleK.value.coerceIn(0f, 1f)
-        if (k > 0.01f) shape.addCircle(bubble.centerX(), bubble.centerY(), pill.height() / 2 * k, Path.Direction.CW)
+        if (k > 0.01f) {
+            if (second != null) shape.addCircle(bubble.centerX(), bubble.centerY(), pill.height() / 2 * k, Path.Direction.CW)
+            if (!lyricBubble.isEmpty) shape.addRoundRect(lyricBubble, lyricBubble.height() / 2, lyricBubble.height() / 2, Path.Direction.CW)
+        }
         canvas.drawPath(shape, bg)
         canvas.clipPath(shape)
         val a = contentA.value.coerceIn(0f, 1f)
@@ -870,6 +877,9 @@ class Island(
         if (k > 0.05f && sec != null && shownKind == Kind.Compact) {
             box.set(bubble)
             sec.drawBubble(canvas, box, k * a)
+        }
+        if (k > 0.05f && !lyricBubble.isEmpty && primary?.id == "music" && shownKind == Kind.Compact) {
+            primary?.drawRow(canvas, lyricBubble, k * a)
         }
         // Resting chrome last, on its own fade, so it never shows over a
         // scene. Clipped to the capsule, so a half-grown shape cannot leak it.
@@ -1212,6 +1222,7 @@ class Island(
             return box.contains(x, y)
         }
         if (now.contains(x, y)) return true
+        if (!lyricBubble.isEmpty && lyricBubble.contains(x, y)) return true
         return second != null && bubble.contains(x, y)
     }
 
@@ -1294,7 +1305,9 @@ class Island(
     // what the master switch is for. Everything else answers to its own
     // switch.
     private fun pages(): List<Scene> = listOf(home) +
-        scenes.filter { it.tab() && prefs.tabOn(it.id) && !(locked && it.personal) }.sortedBy { it.order }
+        scenes.filter { it.tab() && prefs.tabOn(it.id) && !(locked && it.personal) }
+            .sortedBy { it.order }
+            .take(Prefs.MAX_NAV_TABS)
 
     private fun page(dir: Int) {
         val list = pages()
@@ -1315,6 +1328,7 @@ class Island(
             Kind.Compact -> {
                 val sec = second
                 if (sec != null && bubble.contains(x, y)) expand(sec)
+                else if (!lyricBubble.isEmpty && lyricBubble.contains(x, y)) primary?.let { expand(it) }
                 else primary?.let { if (!it.tapCompact()) expand(it) }
             }
             Kind.Panel -> {

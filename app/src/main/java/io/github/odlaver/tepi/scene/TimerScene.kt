@@ -83,8 +83,8 @@ class TimerScene(host: Host, private val timers: Timers) : Scene(host) {
         ui.text(c, host.ctx.getString(R.string.t_timer), ui.label, r.left + ui.dp(26f), ui.baseline(ui.label, r.top + ui.dp(9f)), r.width() - ui.dp(26f), a)
         val y = r.top + ui.dp(18f) + ui.s8
         row(c, r, y, listOf(
-            host.ctx.getString(R.string.t_focus_n, 25) to { timers.focus(25) },
-            host.ctx.getString(R.string.t_focus_n, 50) to { timers.focus(50) },
+            host.ctx.getString(R.string.t_focus_n, 30) to { timers.focus(30) },
+            host.ctx.getString(R.string.t_focus_n, 60) to { timers.focus(60) },
             host.ctx.getString(R.string.t_stopwatch) to { timers.stopwatch() },
         ), a, primaryFirst = true)
         row(c, r, y + ui.btnH + ui.s8, listOf(5, 10, 15).map { m ->

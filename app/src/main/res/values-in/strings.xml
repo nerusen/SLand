@@ -171,7 +171,7 @@
     <string name="shelf_too_big">Terlalu besar untuk rak (maks 25 MB)</string>
     <string name="shelf_failed">Tidak ada yang bisa disimpan</string>
     <string name="save_to_tepi">Simpan ke Tepi</string>
-    <string name="shortcut_focus">Fokus 25</string>
+    <string name="shortcut_focus">Fokus 30</string>
     <string name="shortcut_note">Catatan baru</string>
     <string name="b_audio">Tersambung</string>
     <string name="cd_cam">Kamera sedang dipakai</string>
@@ -464,6 +464,7 @@
     <string name="tabs_notices">Pemberitahuan</string>
     <string name="tabs_home_always">Selalu ada. Semua halaman lain dijangkau dengan menggeser dari Beranda, dan ikon pengaturan ada di barisnya.</string>
     <string name="tabs_note">Halaman yang tidak punya isi otomatis tidak ikut dalam geseran, jadi sakelar di sini untuk halaman yang memang tidak Anda inginkan, bukan yang sedang kosong.</string>
+    <string name="tabs_limit">Navigasi hanya mendukung 7 tab aktif selain Beranda dan Pengaturan. Matikan satu tab untuk mengaktifkan tab lain.</string>
 
     <!-- Tanda di sisi kanan capsule diam -->
     <string name="badge_title">Tanda capsule</string>

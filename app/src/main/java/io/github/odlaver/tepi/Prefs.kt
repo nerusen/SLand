@@ -101,11 +101,15 @@ class Prefs(context: Context) {
     // user has turned off are written down. Home is not asked about — it is
     // the page everything else is reached from, and an island whose navigation
     // is empty is an island with nothing behind the swipe.
-    fun tabOn(id: String) = id == "home" || bool(tabKey(id), true)
+    fun tabOn(id: String) = id == "home" || bool(tabKey(id), DEFAULT_NAV_TABS.contains(id))
 
-    fun setTab(id: String, on: Boolean) {
-        if (id == "home") return
+    fun activeTabCount(): Int = DEFAULT_NAV_IDS.count { tabOn(it) }
+
+    fun setTab(id: String, on: Boolean): Boolean {
+        if (id == "home") return true
+        if (on && !tabOn(id) && activeTabCount() >= MAX_NAV_TABS) return false
         set(tabKey(id), on)
+        return true
     }
 
     // Which notice may put itself up without being asked. The island's live
@@ -213,5 +217,12 @@ class Prefs(context: Context) {
         const val GLARE_DEFAULT = 80
         const val GLARE_MIN = 60
         const val GLARE_MAX = 100
+
+        const val MAX_NAV_TABS = 7
+        val DEFAULT_NAV_TABS = setOf("music", "timer", "prayer", "notes", "shelf", "shots", "maps")
+        val DEFAULT_NAV_IDS = listOf(
+            "music", "timer", "agenda", "prayer", "agents", "notes", "shelf", "github",
+            "shots", "maps", "apps", "finance", "kanban", "assistant",
+        )
     }
 }

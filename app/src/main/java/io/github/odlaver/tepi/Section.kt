@@ -118,7 +118,12 @@ class Section : Page() {
         val g = group()
         row(g, getString(R.string.home), getString(R.string.tabs_home_always), icon = Icon.Home)
         for ((id, title, icon) in PAGES) {
-            toggle(g, getString(title), null, prefs.tabOn(id), icon = icon) { prefs.setTab(id, it); changed() }
+            toggle(g, getString(title), null, prefs.tabOn(id), icon = icon) {
+                if (!prefs.setTab(id, it)) {
+                    toast(getString(R.string.tabs_limit))
+                    rebuild()
+                } else changed()
+            }
         }
         label(getString(R.string.tabs_notices))
         val n = group()

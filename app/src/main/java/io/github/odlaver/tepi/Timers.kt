@@ -1,10 +1,15 @@
 package io.github.odlaver.tepi
 
+import android.app.NotificationManager
+import android.content.Context
+import android.content.Intent
+import android.media.AudioManager
+import android.provider.Settings
 import android.os.Handler
 import android.os.Looper
 
 // Focus, break, countdown, stopwatch; port of src/Timers.cs
-class Timers(private val prefs: Prefs, private val ended: (Kind) -> Unit, private val changed: () -> Unit) {
+class Timers(private val context: Context, private val prefs: Prefs, private val ended: (Kind) -> Unit, private val changed: () -> Unit) {
     enum class Kind { Focus, Break, Countdown, Stopwatch }
 
     private val main = Handler(Looper.getMainLooper())
@@ -47,6 +52,7 @@ class Timers(private val prefs: Prefs, private val ended: (Kind) -> Unit, privat
         startAt = now()
         endAt = startAt + ms
         paused = false
+        if (k == Kind.Focus) enterFocusQuiet()
         arm()
         save()
         changed()
@@ -100,6 +106,7 @@ class Timers(private val prefs: Prefs, private val ended: (Kind) -> Unit, privat
 
     fun stop(notify: Boolean = true) {
         main.removeCallbacks(ring)
+        if (kind == Kind.Focus) restoreFocusQuiet()
         kind = null
         paused = false
         laps.clear()
@@ -115,6 +122,7 @@ class Timers(private val prefs: Prefs, private val ended: (Kind) -> Unit, privat
     // Focus rolls into break
     private fun finish() {
         val k = kind ?: return
+        if (k == Kind.Focus) restoreFocusQuiet()
         if (k == Kind.Focus) {
             val brk = prefs.int("focus.break", 5).coerceIn(1, 30)
             start(Kind.Break, brk * 60_000L)
@@ -149,7 +157,56 @@ class Timers(private val prefs: Prefs, private val ended: (Kind) -> Unit, privat
         paused = prefs.bool("timer.paused", false)
         pausedValue = prefs.sp.getLong("timer.value", 0)
         if (kind != Kind.Stopwatch && !paused) {
-            if (endAt <= now()) { kind = null; save() } else arm()
+            if (endAt <= now()) {
+                if (kind == Kind.Focus) restoreFocusQuiet()
+                kind = null
+                save()
+            } else {
+                if (kind == Kind.Focus) enterFocusQuiet()
+                arm()
+            }
         }
+    }
+
+    private val audio = context.getSystemService(AudioManager::class.java)
+    private val notif = context.getSystemService(NotificationManager::class.java)
+
+    private var originalRinger = -1
+    private var originalDnd = NotificationManager.INTERRUPTION_FILTER_ALL
+
+    private fun enterFocusQuiet() {
+        try { originalRinger = audio.ringerMode } catch (_: Exception) { originalRinger = -1 }
+        try {
+            originalDnd = notif.currentInterruptionFilter
+            if (notif.isNotificationPolicyAccessGranted) {
+                notif.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
+            } else {
+                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+        } catch (_: Exception) { }
+        try { audio.ringerMode = AudioManager.RINGER_MODE_SILENT } catch (_: Exception) { }
+        prefs.set("timer.focus.quiet", true)
+        prefs.set("timer.focus.ringer", originalRinger)
+        prefs.set("timer.focus.dnd", originalDnd)
+    }
+
+    private fun restoreFocusQuiet() {
+        if (!prefs.bool("timer.focus.quiet", false)) {
+            originalRinger = -1
+            return
+        }
+        val ringer = prefs.int("timer.focus.ringer", originalRinger)
+        val dnd = prefs.int("timer.focus.dnd", originalDnd)
+        try {
+            if (notif.isNotificationPolicyAccessGranted) {
+                notif.setInterruptionFilter(dnd)
+            }
+        } catch (_: Exception) { }
+        try {
+            if (ringer in listOf(AudioManager.RINGER_MODE_SILENT, AudioManager.RINGER_MODE_VIBRATE,
+                    AudioManager.RINGER_MODE_NORMAL)) audio.ringerMode = ringer
+        } catch (_: Exception) { }
+        prefs.set("timer.focus.quiet", false)
+        originalRinger = -1
     }
 }

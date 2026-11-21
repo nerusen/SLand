@@ -129,7 +129,6 @@ class Listener : NotificationListenerService() {
         instance = this
         connected = true
         media = Media(this, ComponentName(this, Listener::class.java)) { island?.mediaChanged() }.also { it.start() }
-        applyEnabled()
     }
 
     // Start or pause everything after the master switch
@@ -435,7 +434,7 @@ class Listener : NotificationListenerService() {
             Timers.Kind.Break -> getString(R.string.t_break_done) to getString(R.string.t_again)
             else -> getString(R.string.t_done) to ""
         }
-        val acts = if (k == Timers.Kind.Break) listOf(Action(getString(R.string.t_focus_n, 25), primary = true, icon = Icon.Timer) { timers.focus(25) }) else emptyList()
+        val acts = if (k == Timers.Kind.Break) listOf(Action(getString(R.string.t_focus_n, 30), primary = true, icon = Icon.Timer) { timers.focus(30) }) else emptyList()
         alert(Alert("timer", title, body, Glyph.Check, acts, 8000))
     }
 
@@ -479,7 +478,7 @@ class Listener : NotificationListenerService() {
         val isl = island ?: return false
         when (what) {
             Open.HOME -> isl.openHome()
-            "focus" -> timers.focus(25)
+            "focus" -> timers.focus(30)
             "timer" -> timerScene?.let { isl.expand(it) }
             "note" -> newNote()
             else -> return false
