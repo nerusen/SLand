@@ -86,7 +86,14 @@ jobs:
             tasks="assembleDebug"
             set -- "-PCARTO_KEY=$CARTO_KEY"
           fi
-          ./gradlew --no-daemon $tasks "$@"
+          ./gradlew --no-daemon --console=plain --info $tasks "$@" 2>&1 | tee gradle-build.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "::group::Kotlin compiler diagnostics"
+            grep -nE '^e: |^w: |Compilation error|compile(Debug|Release)Kotlin' gradle-build.log || true
+            echo "::endgroup::"
+            exit "$status"
+          fi
           echo "variants=$variants" >> "$GITHUB_OUTPUT"
 
       # Gradle already writes SLand-debug.apk and SLand-release.apk through
