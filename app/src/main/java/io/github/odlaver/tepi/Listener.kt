@@ -85,7 +85,7 @@ class Listener : NotificationListenerService() {
         lyrics = Lyrics(java.io.File(cacheDir, "lyrics"))
         notes = Notes(this)
         shelf = Shelf(this)
-        timers = Timers(prefs, ended = { timerEnded(it) }, changed = { island?.refresh() })
+        timers = Timers(this, prefs, ended = { timerEnded(it) }, changed = { island?.refresh() })
         reminders = Reminders(this, prefs, prayAlert = { i, at, now -> prayAlert(i, at, now) }, nudge = { nudge(it) })
         agenda = Agenda(this, prefs, changed = { island?.refresh() }, classSoon = { classSoon(it) })
         wallet = Wallet(agenda.vault) { island?.refresh() }
