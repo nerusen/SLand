@@ -970,6 +970,9 @@ class Island(
         "flag" -> Icon.Spark
         "maps" -> Icon.Pin
         "apps" -> Icon.Grid
+        "finance" -> Icon.Purse
+        "kanban" -> Icon.Kanban
+        "assistant" -> Icon.Flash
         else -> Icon.Layers
     }
 

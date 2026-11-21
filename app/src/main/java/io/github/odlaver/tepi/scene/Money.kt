@@ -49,7 +49,7 @@ class FinanceScene(host: Host, private val wallet: Wallet) : TabScene(host) {
     override fun panelHeight(w: Float): Float {
         if (!wallet.configured) return ui.dp(18f) + ui.s12 + ui.dp(34f)
         if (wallet.kpis == null) return ui.dp(18f) + ui.s12 + ui.dp(34f)
-        return minOf(contentHeight(w), ui.dp(210f))
+        return minOf(contentHeight(w), ui.dp(260f))
     }
 
     override fun drawPanel(c: Canvas, r: RectF, a: Float) {
@@ -63,53 +63,51 @@ class FinanceScene(host: Host, private val wallet: Wallet) : TabScene(host) {
             return
         }
 
-        scrolled(c, r) { top ->
-            val rr = RectF(r.left, top, r.right, top + contentHeight(r.width()))
-            var y = head(c, rr, Icon.Purse, s(R.string.finance), formatRupiahCompact(k.totalBalance), a)
+        val rr = r
+        var y = head(c, rr, Icon.Purse, s(R.string.finance), formatRupiahCompact(k.totalBalance), a)
 
-            // Total balance, stated in full
-            ui.text(c, formatRupiah(k.totalBalance), ui.big, rr.left, ui.baseline(ui.big, y + ui.dp(16f)), rr.width(), a)
-            y += ui.dp(34f)
-            ui.text(c, s(R.string.finance_total), ui.small, rr.left, ui.baseline(ui.small, y), rr.width(), a)
-            y += ui.dp(12f) + ui.s8
+        // Total balance, stated in full
+        ui.text(c, formatRupiah(k.totalBalance), ui.big, rr.left, ui.baseline(ui.big, y + ui.dp(16f)), rr.width(), a)
+        y += ui.dp(34f)
+        ui.text(c, s(R.string.finance_total), ui.small, rr.left, ui.baseline(ui.small, y), rr.width(), a)
+        y += ui.dp(12f) + ui.s8
 
-            // Weekly budget: bar plus the numbers behind it
-            val w = k.week
-            val barH = ui.dp(6f)
-            tmp.set(rr.left, y, rr.right, y + barH)
-            ui.fill(c, tmp, barH / 2f, ui.fill, a)
-            val frac = w.usageRatio.coerceIn(0.0, 1.0).toFloat()
-            if (frac > 0f) {
-                tmp.set(rr.left, y, rr.left + rr.width() * frac, y + barH)
-                ui.fill(c, tmp, barH / 2f, if (w.status == "aman") ui.lead else ui.ink, a)
-            }
-            y += barH + ui.s4
-            ui.text(c, "${formatRupiah(w.expense)} / ${formatRupiah(w.cap)}", ui.small,
-                rr.left, ui.baseline(ui.small, y + ui.dp(6f)), rr.width() - ui.dp(90f), a)
-            ui.textEnd(c, budgetStatusLabel(w.status), ui.small, rr.right, ui.baseline(ui.small, y + ui.dp(6f)), a)
-            y += ui.dp(12f) + ui.s8
+        // Weekly budget: bar plus the numbers behind it
+        val w = k.week
+        val barH = ui.dp(6f)
+        tmp.set(rr.left, y, rr.right, y + barH)
+        ui.fill(c, tmp, barH / 2f, ui.fill, a)
+        val frac = w.usageRatio.coerceIn(0.0, 1.0).toFloat()
+        if (frac > 0f) {
+            tmp.set(rr.left, y, rr.left + rr.width() * frac, y + barH)
+            ui.fill(c, tmp, barH / 2f, if (w.status == "aman") ui.lead else ui.ink, a)
+        }
+        y += barH + ui.s4
+        ui.text(c, "${formatRupiah(w.expense)} / ${formatRupiah(w.cap)}", ui.small,
+            rr.left, ui.baseline(ui.small, y + ui.dp(6f)), rr.width() - ui.dp(90f), a)
+        ui.textEnd(c, budgetStatusLabel(w.status), ui.small, rr.right, ui.baseline(ui.small, y + ui.dp(6f)), a)
+        y += ui.dp(12f) + ui.s8
 
-            item(c, rr, y, s(R.string.finance_today),
-                "${formatRupiah(k.today.expense)} · ${s(R.string.finance_left)} ${formatRupiah(k.today.remainingAllowance)}", a)
+        item(c, rr, y, s(R.string.finance_today),
+            "${formatRupiah(k.today.expense)} · ${s(R.string.finance_left)} ${formatRupiah(k.today.remainingAllowance)}", a)
+        y += rowH
+        item(c, rr, y, s(R.string.finance_emergency),
+            "${formatRupiah(k.emergencyBalance)} / ${formatRupiah(k.emergencyTarget)} · ${formatPercent(k.emergencyProgress)}", a)
+        y += rowH
+        item(c, rr, y, s(R.string.finance_freelance),
+            if (k.freelanceFrozen > 0)
+                "${formatRupiah(k.freelanceFrozen)} ${s(R.string.finance_frozen)} ${formatDateShort(k.freelanceUnlockDate)}"
+            else formatRupiah(k.freelanceTotal), a)
+        y += rowH
+
+        if (k.week.cigarettePacks > 0) {
+            item(c, rr, y, s(R.string.finance_cigarette),
+                "${k.week.cigarettePacks} × · ${formatRupiah(k.week.cigaretteSpend)}", a)
             y += rowH
-            item(c, rr, y, s(R.string.finance_emergency),
-                "${formatRupiah(k.emergencyBalance)} / ${formatRupiah(k.emergencyTarget)} · ${formatPercent(k.emergencyProgress)}", a)
-            y += rowH
-            item(c, rr, y, s(R.string.finance_freelance),
-                if (k.freelanceFrozen > 0)
-                    "${formatRupiah(k.freelanceFrozen)} ${s(R.string.finance_frozen)} ${formatDateShort(k.freelanceUnlockDate)}"
-                else formatRupiah(k.freelanceTotal), a)
-            y += rowH
-
-            if (k.week.cigarettePacks > 0) {
-                item(c, rr, y, s(R.string.finance_cigarette),
-                    "${k.week.cigarettePacks} × · ${formatRupiah(k.week.cigaretteSpend)}", a)
-                y += rowH
-            }
-            wallet.guard?.let { g ->
-                if (g.blocked) {
-                    ui.text(c, g.message, ui.small, rr.left, ui.baseline(ui.small, y + ui.dp(10f)), rr.width(), a)
-                }
+        }
+        wallet.guard?.let { g ->
+            if (g.blocked) {
+                ui.text(c, g.message, ui.small, rr.left, ui.baseline(ui.small, y + ui.dp(10f)), rr.width(), a)
             }
         }
     }
@@ -138,7 +136,7 @@ class KanbanScene(host: Host, private val wallet: Wallet) : TabScene(host) {
 
     override fun panelHeight(w: Float): Float {
         if (wallet.tasks.isEmpty()) return ui.dp(18f) + ui.s12 + ui.dp(34f)
-        return minOf(contentHeight(w), ui.dp(210f))
+        return minOf(contentHeight(w), ui.dp(260f))
     }
 
     override fun drawPanel(c: Canvas, r: RectF, a: Float) {
@@ -152,31 +150,29 @@ class KanbanScene(host: Host, private val wallet: Wallet) : TabScene(host) {
         }
 
         val locked = wallet.lockedWishlist().size
-        scrolled(c, r) { top ->
-            val rr = RectF(r.left, top, r.right, top + contentHeight(r.width()))
-            var y = head(c, rr, Icon.Kanban, s(R.string.kanban),
-                if (locked > 0) "$locked ${s(R.string.kanban_locked)}" else "${wallet.tasks.size}", a)
+        val rr = r
+        var y = head(c, rr, Icon.Kanban, s(R.string.kanban),
+            if (locked > 0) "$locked ${s(R.string.kanban_locked)}" else "${wallet.tasks.size}", a)
 
-            for ((status, label, _) in KANBAN_COLUMNS) {
-                val rows = wallet.column(status)
-                if (rows.isEmpty()) continue
-                ui.text(c, "$label · ${rows.size}", ui.small, rr.left, ui.baseline(ui.small, y + ui.dp(8f)),
-                    rr.width() - ui.dp(70f), a)
-                ui.textEnd(c, formatRupiahCompact(sumOf(rows.map { it.amount })), ui.small,
-                    rr.right, ui.baseline(ui.small, y + ui.dp(8f)), a)
-                y += ui.dp(16f)
-                for (t in rows.take(PER_COLUMN)) {
-                    val unlock = t.unlockAt?.take(10)
-                    val detail = buildString {
-                        append(formatRupiah(t.amount))
-                        if (t.client != null) append(" · ${t.client}")
-                        if (unlock != null && unlock > todayWIB()) {
-                            append(" · ${s(R.string.kanban_until)} ${formatDateShort(unlock)}")
-                        }
+        for ((status, label, _) in KANBAN_COLUMNS) {
+            val rows = wallet.column(status)
+            if (rows.isEmpty()) continue
+            ui.text(c, "$label · ${rows.size}", ui.small, rr.left, ui.baseline(ui.small, y + ui.dp(8f)),
+                rr.width() - ui.dp(70f), a)
+            ui.textEnd(c, formatRupiahCompact(sumOf(rows.map { it.amount })), ui.small,
+                rr.right, ui.baseline(ui.small, y + ui.dp(8f)), a)
+            y += ui.dp(16f)
+            for (t in rows.take(PER_COLUMN)) {
+                val unlock = t.unlockAt?.take(10)
+                val detail = buildString {
+                    append(formatRupiah(t.amount))
+                    if (t.client != null) append(" · ${t.client}")
+                    if (unlock != null && unlock > todayWIB()) {
+                        append(" · ${s(R.string.kanban_until)} ${formatDateShort(unlock)}")
                     }
-                    item(c, rr, y, t.title, detail, a)
-                    y += rowH
                 }
+                item(c, rr, y, t.title, detail, a)
+                y += rowH
             }
         }
     }
@@ -227,7 +223,7 @@ class AssistantScene(
     override fun panelHeight(w: Float): Float {
         if (!ai.configured) return ui.dp(18f) + ui.s12 + ui.dp(34f)
         if (shown.isEmpty()) return ui.dp(18f) + ui.s12 + ui.dp(20f) + ui.btnH + ui.s8
-        return minOf(contentHeight(w), ui.dp(210f))
+        return minOf(contentHeight(w), ui.dp(260f))
     }
 
     override fun drawPanel(c: Canvas, r: RectF, a: Float) {
@@ -249,24 +245,22 @@ class AssistantScene(
             return
         }
 
-        scrolled(c, r) { top: Float ->
-            val rr = RectF(r.left, top, r.right, top + contentHeight(r.width()))
-            var y = head(c, rr, Icon.Flash, s(R.string.assistant), end, a)
-            for (t: Assistant.Turn in shown) {
-                val mine = t.role == "user"
-                ui.text(c, if (mine) s(R.string.assistant_you) else s(R.string.assistant_name),
-                    ui.small, rr.left, ui.baseline(ui.small, y + ui.dp(7f)), rr.width(), a)
-                y += ui.dp(14f)
-                val l = layout(t.text, mine, rr.width())
-                c.save()
-                c.translate(rr.left, y)
-                l.paint.alpha = (255 * a).toInt()
-                l.draw(c)
-                c.restore()
-                y += l.height
-            }
-            composer(c, rr, y + ui.s4, a)
+        val rr = r
+        var y = head(c, rr, Icon.Flash, s(R.string.assistant), end, a)
+        for (t: Assistant.Turn in shown) {
+            val mine = t.role == "user"
+            ui.text(c, if (mine) s(R.string.assistant_you) else s(R.string.assistant_name),
+                ui.small, rr.left, ui.baseline(ui.small, y + ui.dp(7f)), rr.width(), a)
+            y += ui.dp(14f)
+            val l = layout(t.text, mine, rr.width())
+            c.save()
+            c.translate(rr.left, y)
+            l.paint.alpha = (255 * a).toInt()
+            l.draw(c)
+            c.restore()
+            y += l.height
         }
+        composer(c, rr, y + ui.s4, a)
     }
 
     private fun composer(c: Canvas, r: RectF, y: Float, a: Float) {
