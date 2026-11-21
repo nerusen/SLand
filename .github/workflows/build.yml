@@ -86,11 +86,14 @@ jobs:
             tasks="assembleDebug"
             set -- "-PCARTO_KEY=$CARTO_KEY"
           fi
-          ./gradlew --no-daemon --console=plain --info $tasks "$@" 2>&1 | tee gradle-build.log
-          status=${PIPESTATUS[0]}
+          set +e
+          ./gradlew --no-daemon --console=plain --info $tasks "$@" > gradle-build.log 2>&1
+          status=$?
+          set -e
+          cat gradle-build.log
           if [ "$status" -ne 0 ]; then
             echo "::group::Kotlin compiler diagnostics"
-            grep -nE '^e: |^w: |Compilation error|compile(Debug|Release)Kotlin' gradle-build.log || true
+            grep -n -E '(^|[[:space:]])e: |(^|[[:space:]])w: |Compilation error|^> Task .*Kotlin FAILED' gradle-build.log || true
             echo "::endgroup::"
             exit "$status"
           fi
