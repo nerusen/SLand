@@ -8,7 +8,7 @@ import org.json.JSONObject
 import java.util.concurrent.Executors
 
 /*
- * Gemini client, ported from wallet/src/lib/assistant/*.
+ * Gemini client, ported from wallet/src/lib/assistant/.
  *
  * The web app proxies through its own route handler; the phone has no server,
  * so it calls generativelanguage.googleapis.com directly with a key held in the
