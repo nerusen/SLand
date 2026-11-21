@@ -567,4 +567,40 @@
     <string name="maps_key">Kunci basemap</string>
     <string name="maps_key_on">Ada. Peta diambil dari CARTO, yang sejak September 2026 mewajibkan kunci pada setiap petak.</string>
     <string name="maps_key_off">Tidak ada pada build ini, jadi peta tidak bisa digambar. Angka aktivitas jalan tetap berjalan: itu dari penghitung langkah milik ponsel.</string>
+
+    <!-- Dompet: cermin hanya-baca dari basis data Supabase yang ditulis aplikasi web -->
+    <string name="finance">Keuangan</string>
+    <string name="finance_total">Total seluruh dompet</string>
+    <string name="finance_today">Hari ini</string>
+    <string name="finance_left">sisa</string>
+    <string name="finance_emergency">Dana darurat</string>
+    <string name="finance_freelance">Freelance</string>
+    <string name="finance_frozen">dibekukan sampai</string>
+    <string name="finance_cigarette">Rokok minggu ini</string>
+    <string name="finance_loading">Membaca dompet…</string>
+    <string name="finance_unset">Belum tersambung. Isi URL Supabase dan anon key di setelan.</string>
+
+    <string name="kanban">Papan</string>
+    <string name="kanban_empty">Belum ada kartu di papan.</string>
+    <string name="kanban_locked">ditahan</string>
+    <string name="kanban_until">sampai</string>
+
+    <string name="assistant">Asisten</string>
+    <string name="assistant_name">Asisten</string>
+    <string name="assistant_you">Kamu</string>
+    <string name="assistant_ask">Tanya</string>
+    <string name="assistant_clear">Bersihkan</string>
+    <string name="assistant_thinking">memikirkan…</string>
+    <string name="assistant_hint">Tanya soal anggaran, dana darurat, atau pengeluaran minggu ini.</string>
+    <string name="assistant_unset">Belum ada kunci Gemini. Isi di setelan untuk mulai bertanya.</string>
+
+    <!-- Setelan dompet -->
+    <string name="wallet_section">Dompet</string>
+    <string name="wallet_url">URL Supabase</string>
+    <string name="wallet_anon">Anon key</string>
+    <string name="wallet_test">Uji sambungan</string>
+    <string name="wallet_note">Ponsel hanya membaca. Pencatatan transaksi tetap di aplikasi web, yang memegang trigger penjaga konsistensi saldo.</string>
+    <string name="gemini_key">Kunci API Gemini</string>
+    <string name="gemini_model">Model</string>
+    <string name="gemini_note">Kunci disimpan di keystore dan dikirim langsung ke Google. Pertanyaan membawa ringkasan angkamu, bukan baris mentahnya.</string>
 </resources>

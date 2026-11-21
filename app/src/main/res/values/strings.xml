@@ -570,4 +570,40 @@
     <string name="maps_key">Basemap key</string>
     <string name="maps_key_on">Present. The map draws from CARTO, which has required a key on every tile since September 2026.</string>
     <string name="maps_key_off">Missing from this build, so the map cannot draw. The walking figures still work: they come from the phone\'s own step counter.</string>
+
+    <!-- Wallet: a read-only mirror of the Supabase database the web app writes to -->
+    <string name="finance">Finance</string>
+    <string name="finance_total">Total across every purse</string>
+    <string name="finance_today">Today</string>
+    <string name="finance_left">left</string>
+    <string name="finance_emergency">Emergency fund</string>
+    <string name="finance_freelance">Freelance</string>
+    <string name="finance_frozen">held until</string>
+    <string name="finance_cigarette">Cigarettes this week</string>
+    <string name="finance_loading">Reading the wallet…</string>
+    <string name="finance_unset">Not connected. Add the Supabase URL and anon key in settings.</string>
+
+    <string name="kanban">Board</string>
+    <string name="kanban_empty">No cards on the board.</string>
+    <string name="kanban_locked">held</string>
+    <string name="kanban_until">until</string>
+
+    <string name="assistant">Assistant</string>
+    <string name="assistant_name">Assistant</string>
+    <string name="assistant_you">You</string>
+    <string name="assistant_ask">Ask</string>
+    <string name="assistant_clear">Clear</string>
+    <string name="assistant_thinking">thinking…</string>
+    <string name="assistant_hint">Ask about the budget, the emergency fund, or this week\'s spending.</string>
+    <string name="assistant_unset">No Gemini key. Add one in settings to ask questions.</string>
+
+    <!-- Wallet settings -->
+    <string name="wallet_section">Wallet</string>
+    <string name="wallet_url">Supabase URL</string>
+    <string name="wallet_anon">Anon key</string>
+    <string name="wallet_test">Test connection</string>
+    <string name="wallet_note">The phone only reads. Recording a transaction stays in the web app, which owns the triggers that keep balances consistent.</string>
+    <string name="gemini_key">Gemini API key</string>
+    <string name="gemini_model">Model</string>
+    <string name="gemini_note">The key is held in the keystore and sent straight to Google. Questions carry a summary of your figures, never the raw rows.</string>
 </resources>

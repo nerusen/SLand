@@ -63,10 +63,82 @@ abstract class TabScene(host: Host) : Scene(host) {
         }
     }
 
+    // ── Vertical scrolling ────────────────────────────────────────────────────
+    //
+    // A tab whose content outgrows its panel opts in by reporting contentHeight
+    // and wrapping its body in scrolled().
+    //
+    // Scrolling is driven from a narrow rail along the right edge rather than
+    // from anywhere in the panel. The island treats a grab() that returns true
+    // as taking the entire gesture — no tap on lift, no horizontal paging — so
+    // claiming the whole panel would cost the tab both its buttons and the
+    // swipe between tabs. Restricting the claim to the rail, the way the volume
+    // track does, keeps every other gesture intact.
+
+    protected var scroll = 0f; private set
+    private var viewH = 0f
+    private var maxScroll = 0f
+    private var grabY = 0f
+    private var grabScroll = 0f
+    private val rail = RectF()
+
+    // Height of the whole body; -1 means the tab does not scroll
+    protected open fun contentHeight(w: Float): Float = -1f
+
+    /** Clip to [r], shift by the scroll offset, and draw [body] from its top. */
+    protected fun scrolled(c: Canvas, r: RectF, body: (Float) -> Unit) {
+        val content = contentHeight(r.width())
+        viewH = r.height()
+        maxScroll = if (content <= 0f) 0f else maxOf(0f, content - viewH)
+        scroll = scroll.coerceIn(0f, maxScroll)
+        if (maxScroll <= 0f) {
+            rail.setEmpty()
+            body(r.top)
+            return
+        }
+        rail.set(r.right - ui.dp(20f), r.top, r.right, r.bottom)
+        val save = c.save()
+        c.clipRect(r)
+        c.translate(0f, -scroll)
+        body(r.top)
+        c.restoreToCount(save)
+        railing(c, r)
+    }
+
+    // Thumb on the right edge, sized to the visible fraction of the content
+    private fun railing(c: Canvas, r: RectF) {
+        val total = viewH + maxScroll
+        if (total <= 0f) return
+        val thumb = maxOf(ui.dp(24f), viewH * (viewH / total))
+        val top = r.top + (viewH - thumb) * (scroll / maxScroll)
+        val w = ui.dp(3f)
+        tmp.set(r.right - w, top, r.right, top + thumb)
+        ui.fill(c, tmp, w / 2f, ui.faint, 1f)
+    }
+
+    override fun grab(x: Float, y: Float): Boolean {
+        if (maxScroll <= 0f || !rail.contains(x, y)) return false
+        grabY = y
+        grabScroll = scroll
+        return true
+    }
+
+    override fun drag(x: Float, y: Float) {
+        if (maxScroll <= 0f) return
+        // Dragging down the rail moves the thumb down, so content moves up
+        val travel = maxOf(1f, viewH - maxOf(ui.dp(24f), viewH * (viewH / (viewH + maxScroll))))
+        scroll = (grabScroll + (y - grabY) * (maxScroll / travel)).coerceIn(0f, maxScroll)
+        host.refresh()
+    }
+
+    /** Tap coordinates corrected for the scroll offset. */
     override fun tap(x: Float, y: Float): Boolean {
-        for ((r, act) in hits) if (r.contains(x, y)) { host.haptic(); act(); host.refresh(); return true }
+        val ty = if (maxScroll > 0f) y + scroll else y
+        for ((r, act) in hits) if (r.contains(x, ty)) { host.haptic(); act(); host.refresh(); return true }
         return false
     }
+
+    protected fun resetScroll() { scroll = 0f }
 }
 
 private val hm = DateFormat.getTimeInstance(DateFormat.SHORT)

@@ -12,7 +12,8 @@ enum class Icon {
     Play, Pause, Next, Prev, Stop, Plus, Check, Close, Timer, Note, Gear, Home, Hide, Copy, Share, Open, Reply,
     Flag, Music, Lyrics, Bell, Moon, Drop, Eye, Stretch, Bolt, Phone, Headphones, Download, Nav, Camera, Shield,
     Book, Tasks, Shelf, Info, Code, User, Battery, Layers, Hand, Power, Chat, Link, Pin, Trash, Laptop, Globe, Coffee, Chevron, Spark,
-    Wifi, Bluetooth, Github, Volume, Mute, Image, Flash, Hotspot, Plane, Leaf, BellOff, Lock, Grid, Palette, Signal
+    Wifi, Bluetooth, Github, Volume, Mute, Image, Flash, Hotspot, Plane, Leaf, BellOff, Lock, Grid, Palette, Signal,
+    Chart, Kanban, Purse
 }
 
 // Line icons on a 24-unit grid, drawn with the Ink stroke
@@ -243,6 +244,39 @@ object Icons {
                     rr(c, x, 19.5f - h, x + 3.2f, 19.5f, 1f)
                     x += 4.6f
                 }
+            }
+            // Axes with a rising line and a marker at each vertex: the shape
+            // used for a trend, not for the bars of Signal
+            Icon.Chart -> {
+                poly(c, 4f, 3.5f, 4f, 20f, 20.5f, 20f)
+                poly(c, 7f, 15.5f, 11f, 11f, 14.5f, 13.5f, 19.5f, 6.5f)
+                fill()
+                c.drawCircle(11f, 11f, 1.3f, p)
+                c.drawCircle(19.5f, 6.5f, 1.3f, p)
+            }
+            // Three columns of unequal fill: a board whose lanes hold
+            // different amounts of work
+            Icon.Kanban -> {
+                rr(c, 3f, 4.5f, 21f, 19.5f, 2.5f)
+                ln(c, 9f, 4.5f, 9f, 19.5f)
+                ln(c, 15f, 4.5f, 15f, 19.5f)
+                fill()
+                rr(c, 4.5f, 7f, 7.5f, 13f, 0.8f)
+                rr(c, 10.5f, 7f, 13.5f, 16.5f, 0.8f)
+                rr(c, 16.5f, 7f, 19.5f, 10f, 0.8f)
+            }
+            // A folded billfold with the clasp as a dot on its inner edge
+            Icon.Purse -> {
+                rr(c, 3f, 6.5f, 21f, 19f, 2.5f)
+                path.reset()
+                path.moveTo(3f, 9.5f)
+                path.lineTo(16f, 9.5f)
+                path.quadTo(17.5f, 9.5f, 17.5f, 11f)
+                path.lineTo(17.5f, 14.5f)
+                path.quadTo(17.5f, 16f, 16f, 16f)
+                path.lineTo(3f, 16f)
+                c.drawPath(path, p)
+                fill(); c.drawCircle(14.5f, 12.75f, 1.3f, p)
             }
         }
         line()

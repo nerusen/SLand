@@ -56,6 +56,8 @@ class Listener : NotificationListenerService() {
     private var alerts: AlertScene? = null
     lateinit var live: Live
     lateinit var agenda: Agenda
+    lateinit var wallet: Wallet
+    lateinit var assistant: Assistant
     lateinit var pc: Pc
     private lateinit var watch: Watch
     lateinit var radios: Radios
@@ -86,6 +88,8 @@ class Listener : NotificationListenerService() {
         timers = Timers(prefs, ended = { timerEnded(it) }, changed = { island?.refresh() })
         reminders = Reminders(this, prefs, prayAlert = { i, at, now -> prayAlert(i, at, now) }, nudge = { nudge(it) })
         agenda = Agenda(this, prefs, changed = { island?.refresh() }, classSoon = { classSoon(it) })
+        wallet = Wallet(agenda.vault) { island?.refresh() }
+        assistant = Assistant(this)
         pc = Pc(this, agenda.vault, prefs) { island?.refresh() }
         pc.onFile = { name, uri -> fromLaptop(name, uri) }
         radios = Radios(this) { island?.refresh() }
@@ -134,6 +138,7 @@ class Listener : NotificationListenerService() {
             reminders.start()
             watch.start()
             agenda.start()
+            wallet.start()
             pc.start()
             radios.start()
             github.start()
@@ -150,6 +155,7 @@ class Listener : NotificationListenerService() {
             reminders.stop()
             watch.stop()
             agenda.stop()
+            wallet.stop()
             pc.stop()
             radios.stop()
             github.stop()
@@ -179,6 +185,7 @@ class Listener : NotificationListenerService() {
         reminders.stop()
         watch.stop()
         agenda.stop()
+        wallet.stop()
         pc.stop()
         radios.stop()
         github.stop()
@@ -260,6 +267,11 @@ class Listener : NotificationListenerService() {
         isl.register(io.github.odlaver.tepi.scene.NotesTab(isl, notes, { newNote() }) { open(Items::class.java, Items.NOTES) })
         isl.register(io.github.odlaver.tepi.scene.ShelfTab(isl, shelf, { picked(it) }) { open(Items::class.java, Items.SHELF) })
         isl.register(io.github.odlaver.tepi.scene.AgentsTab(isl, pc))
+        // The wallet mirror: balances, the Kanban board, and the assistant that
+        // answers questions about both
+        isl.register(io.github.odlaver.tepi.scene.FinanceScene(isl, wallet))
+        isl.register(io.github.odlaver.tepi.scene.KanbanScene(isl, wallet))
+        isl.register(io.github.odlaver.tepi.scene.AssistantScene(isl, wallet, assistant))
         // Recent captures as a grid, beside the card that announces them
         isl.register(io.github.odlaver.tepi.scene.ShotsTab(isl, capture) {
             isl.open(android.content.Intent(android.content.Intent.ACTION_VIEW, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI))

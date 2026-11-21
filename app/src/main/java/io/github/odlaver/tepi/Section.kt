@@ -469,7 +469,61 @@ class Section : Page() {
             })
         }
         laptop()
+        money()
         note(getString(R.string.connect_privacy))
+    }
+
+    // Supabase mirror plus the Gemini key. Both are read-only on the phone:
+    // every mutation stays in the web app that owns the balance triggers.
+    private fun money() {
+        val w = Listener.instance?.wallet ?: return
+        val ai = Listener.instance?.assistant ?: return
+
+        label(getString(R.string.wallet_section))
+        val g = group()
+        if (w.configured) {
+            row(g, getString(R.string.connected), getString(R.string.wallet_url), button(getString(R.string.wallet_test), false) {
+                w.testConnection { _, msg -> toast(msg) }
+            }, Icon.Purse)
+            row(g, getString(R.string.disconnect), null, icon = Icon.Close) {
+                w.configure(null, null); rebuild()
+            }
+        } else {
+            val url = field(getString(R.string.wallet_url))
+            val anon = field(getString(R.string.wallet_anon), secret = true)
+            form(g, url, anon, button(getString(R.string.save)) {
+                val u = url.text.toString().trim()
+                val a = anon.text.toString().trim()
+                if (!u.startsWith("https://") || a.isEmpty()) { toast(getString(R.string.token_bad)); return@button }
+                w.configure(u, a)
+                w.testConnection { ok, msg -> toast(msg); if (ok) w.refresh(); rebuild() }
+            })
+        }
+        note(getString(R.string.wallet_note))
+
+        label(getString(R.string.assistant))
+        val a = group()
+        if (ai.configured) {
+            row(a, Assistant.MODEL_LABELS[ai.model()] ?: ai.model(), getString(R.string.gemini_model),
+                button(getString(R.string.choose), false) {
+                    val ids = Assistant.MODEL_IDS
+                    val names = ids.map { Assistant.MODEL_LABELS[it] ?: it }.toTypedArray()
+                    AlertDialog.Builder(this).setTitle(R.string.gemini_model).setItems(names) { _, i ->
+                        ai.setModel(ids[i]); rebuild()
+                    }.show()
+                }, Icon.Flash)
+            row(a, getString(R.string.disconnect), null, icon = Icon.Close) {
+                ai.configure(null); ai.clear(); rebuild()
+            }
+        } else {
+            val key = field(getString(R.string.gemini_key), secret = true)
+            form(a, key, button(getString(R.string.save)) {
+                val k = key.text.toString().trim()
+                if (k.isEmpty()) return@button
+                ai.configure(k); rebuild()
+            })
+        }
+        note(getString(R.string.gemini_note))
     }
 
     // Classic token with read:user, or a fine-grained one; the calendar is
@@ -616,6 +670,9 @@ class Section : Page() {
             Triple("shots", R.string.tab_shots, Icon.Image),
             Triple("maps", R.string.tab_maps, Icon.Pin),
             Triple("apps", R.string.tab_apps, Icon.Grid),
+            Triple("finance", R.string.finance, Icon.Purse),
+            Triple("kanban", R.string.kanban, Icon.Kanban),
+            Triple("assistant", R.string.assistant, Icon.Flash),
         )
 
         // And the notices that may put themselves up without being asked.
