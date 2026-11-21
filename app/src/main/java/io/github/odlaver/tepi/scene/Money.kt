@@ -282,7 +282,7 @@ class AssistantScene(
     private fun ask() {
         if (ai.busy) return
         host.input(host.ctx.getString(R.string.assistant_ask)) { text ->
-            ai.ask(text, wallet) { _, _ ->
+            ai.ask(text, wallet) { _answer, _error ->
                 resetScroll()
                 host.refresh()
             }
