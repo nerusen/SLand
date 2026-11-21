@@ -377,7 +377,7 @@ class Island(
     // looks like a bug rather than a feature. Both conditions are checked
     // anyway, because the timer firing is the one moment where being wrong
     // about this would be permanent.
-    private fun held() = opened === music && music.lockOn
+    private fun held() = (opened === music && music.lockOn) || opened?.id == "assistant"
 
     private fun armClose() {
         main.removeCallbacks(closePanel)
@@ -972,7 +972,7 @@ class Island(
         "apps" -> Icon.Grid
         "finance" -> Icon.Purse
         "kanban" -> Icon.Kanban
-        "assistant" -> Icon.Flash
+        "assistant" -> Icon.Spark
         else -> Icon.Layers
     }
 

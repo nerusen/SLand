@@ -146,6 +146,11 @@ class Prefs(context: Context) {
         get() = bool("eye.sway", true)
         set(v) = set("eye.sway", v)
 
+    // Wallet balance privacy: the Finance tab keeps the user's choice locally.
+    var financeBalanceHidden: Boolean
+        get() = bool("finance.balance.hidden", false)
+        set(v) = set("finance.balance.hidden", v)
+
     companion object {
         private fun tabKey(id: String) = "tab.$id"
         private fun liveKey(id: String) = "live.$id"

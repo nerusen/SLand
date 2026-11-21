@@ -18,6 +18,7 @@ import io.github.odlaver.tepi.formatRupiah
 import io.github.odlaver.tepi.formatRupiahCompact
 import io.github.odlaver.tepi.sumOf
 import io.github.odlaver.tepi.todayWIB
+import io.github.odlaver.tepi.Prefs
 import kotlin.math.max
 
 /*
@@ -64,13 +65,28 @@ class FinanceScene(host: Host, private val wallet: Wallet) : TabScene(host) {
         }
 
         val rr = r
-        var y = head(c, rr, Icon.Purse, s(R.string.finance), formatRupiahCompact(k.totalBalance), a)
+        var y = head(c, rr, Icon.Purse, s(R.string.finance), null, a)
 
-        // Total balance, stated in full
-        ui.text(c, formatRupiah(k.totalBalance), ui.big, rr.left, ui.baseline(ui.big, y + ui.dp(16f)), rr.width(), a)
-        y += ui.dp(34f)
-        ui.text(c, s(R.string.finance_total), ui.small, rr.left, ui.baseline(ui.small, y), rr.width(), a)
-        y += ui.dp(12f) + ui.s8
+        val balancePrefs = Prefs(host.ctx)
+        val hidden = balancePrefs.financeBalanceHidden
+        val blockH = ui.dp(48f)
+        tmp.set(rr.left, y + ui.dp(4f), rr.right, y + blockH + ui.dp(4f))
+        ui.fill(c, tmp, ui.radiusRow, ui.fill, a)
+        ui.text(c, s(R.string.finance_total), ui.small, tmp.left + ui.s12,
+            ui.baseline(ui.small, tmp.top + ui.dp(12f)), tmp.width() - ui.dp(52f), a)
+        val balance = if (hidden) "••••••••" else formatRupiah(k.totalBalance)
+        ui.text(c, balance, ui.big, tmp.left + ui.s12,
+            ui.baseline(ui.big, tmp.top + ui.dp(32f)), tmp.width() - ui.dp(52f), a)
+
+        val eyeSize = ui.dp(34f)
+        val eyeRect = RectF(tmp.right - eyeSize - ui.dp(7f), tmp.top + (tmp.height() - eyeSize) / 2f,
+            tmp.right - ui.dp(7f), tmp.top + (tmp.height() + eyeSize) / 2f)
+        ui.icon(c, if (hidden) Icon.Eye else Icon.Hide, eyeRect.centerX(), eyeRect.centerY(), ui.dp(18f), ui.ink, a)
+        hits.add(eyeRect to {
+            balancePrefs.financeBalanceHidden = !hidden
+            host.refresh()
+        })
+        y = tmp.bottom + ui.s8
 
         // Weekly budget: bar plus the numbers behind it
         val w = k.week
@@ -88,6 +104,7 @@ class FinanceScene(host: Host, private val wallet: Wallet) : TabScene(host) {
         ui.textEnd(c, budgetStatusLabel(w.status), ui.small, rr.right, ui.baseline(ui.small, y + ui.dp(6f)), a)
         y += ui.dp(12f) + ui.s8
 
+        // Today, emergency, freelance financials
         item(c, rr, y, s(R.string.finance_today),
             "${formatRupiah(k.today.expense)} · ${s(R.string.finance_left)} ${formatRupiah(k.today.remainingAllowance)}", a)
         y += rowH
@@ -110,6 +127,7 @@ class FinanceScene(host: Host, private val wallet: Wallet) : TabScene(host) {
                 ui.text(c, g.message, ui.small, rr.left, ui.baseline(ui.small, y + ui.dp(10f)), rr.width(), a)
             }
         }
+
     }
 }
 
@@ -231,13 +249,13 @@ class AssistantScene(
         val end: String? = if (ai.busy) s(R.string.assistant_thinking) else Assistant.MODEL_LABELS[ai.model()]
 
         if (!ai.configured) {
-            val y = head(c, r, Icon.Flash, s(R.string.assistant), null, a)
+            val y = head(c, r, Icon.Spark, s(R.string.assistant), null, a)
             ui.text(c, s(R.string.assistant_unset), ui.body, r.left, ui.baseline(ui.body, y + ui.dp(10f)), r.width(), a)
             return
         }
 
         if (shown.isEmpty()) {
-            var y = head(c, r, Icon.Flash, s(R.string.assistant), end, a)
+            var y = head(c, r, Icon.Spark, s(R.string.assistant), end, a)
             ui.text(c, ai.lastError ?: s(R.string.assistant_hint), ui.body, r.left,
                 ui.baseline(ui.body, y + ui.dp(8f)), r.width(), a)
             y += ui.dp(20f)
@@ -246,7 +264,7 @@ class AssistantScene(
         }
 
         val rr = r
-        var y = head(c, rr, Icon.Flash, s(R.string.assistant), end, a)
+        var y = head(c, rr, Icon.Spark, s(R.string.assistant), end, a)
         for (t: Assistant.Turn in shown) {
             val mine = t.role == "user"
             ui.text(c, if (mine) s(R.string.assistant_you) else s(R.string.assistant_name),
@@ -266,7 +284,7 @@ class AssistantScene(
     private fun composer(c: Canvas, r: RectF, y: Float, a: Float) {
         val half = (r.width() - ui.s8) / 2f
         tmp.set(r.left, y, r.left + half, y + ui.btnH)
-        ui.button(c, tmp, s(R.string.assistant_ask), a, primary = true, icon = Icon.Flash)
+        ui.button(c, tmp, s(R.string.assistant_ask), a, primary = true, icon = Icon.Spark)
         hits.add(RectF(tmp) to { ask() })
 
         tmp.set(r.left + half + ui.s8, y, r.right, y + ui.btnH)

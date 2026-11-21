@@ -500,6 +500,12 @@ class Section : Page() {
             })
         }
         note(getString(R.string.wallet_note))
+        val privacy = group()
+        toggle(privacy, getString(R.string.finance_hide_balance),
+            getString(R.string.finance_hide_balance_sub), prefs.financeBalanceHidden, icon = Icon.Eye) {
+            prefs.financeBalanceHidden = it
+            rebuild()
+        }
 
         label(getString(R.string.assistant))
         val a = group()
@@ -511,7 +517,7 @@ class Section : Page() {
                     AlertDialog.Builder(this).setTitle(R.string.gemini_model).setItems(names) { _, i ->
                         ai.setModel(ids[i]); rebuild()
                     }.show()
-                }, Icon.Flash)
+                }, Icon.Spark)
             row(a, getString(R.string.disconnect), null, icon = Icon.Close) {
                 ai.configure(null); ai.clear(); rebuild()
             }
@@ -672,7 +678,7 @@ class Section : Page() {
             Triple("apps", R.string.tab_apps, Icon.Grid),
             Triple("finance", R.string.finance, Icon.Purse),
             Triple("kanban", R.string.kanban, Icon.Kanban),
-            Triple("assistant", R.string.assistant, Icon.Flash),
+            Triple("assistant", R.string.assistant, Icon.Spark),
         )
 
         // And the notices that may put themselves up without being asked.

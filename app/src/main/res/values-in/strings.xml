@@ -600,6 +600,8 @@
     <string name="wallet_anon">Anon key</string>
     <string name="wallet_test">Uji sambungan</string>
     <string name="wallet_note">Ponsel hanya membaca. Pencatatan transaksi tetap di aplikasi web, yang memegang trigger penjaga konsistensi saldo.</string>
+    <string name="finance_hide_balance">Sembunyikan total saldo</string>
+    <string name="finance_hide_balance_sub">Simpan total saldo dompet agar tetap tersembunyi di tab Keuangan.</string>
     <string name="gemini_key">Kunci API Gemini</string>
     <string name="gemini_model">Model</string>
     <string name="gemini_note">Kunci disimpan di keystore dan dikirim langsung ke Google. Pertanyaan membawa ringkasan angkamu, bukan baris mentahnya.</string>

@@ -603,6 +603,8 @@
     <string name="wallet_anon">Anon key</string>
     <string name="wallet_test">Test connection</string>
     <string name="wallet_note">The phone only reads. Recording a transaction stays in the web app, which owns the triggers that keep balances consistent.</string>
+    <string name="finance_hide_balance">Hide total balance</string>
+    <string name="finance_hide_balance_sub">Keep the total wallet balance hidden in the Finance tab.</string>
     <string name="gemini_key">Gemini API key</string>
     <string name="gemini_model">Model</string>
     <string name="gemini_note">The key is held in the keystore and sent straight to Google. Questions carry a summary of your figures, never the raw rows.</string>
