@@ -713,9 +713,10 @@ class Island(
         lyricBubble.setEmpty()
         val lyricW = if (primary?.id == "music") primary?.rowWidth() ?: 0f else 0f
         if (lyricW > 0f) {
-            val lyricLeft = if (second != null) bubble.right + ui.s8 else target.right + ui.s8
-            val lyricRight = min(span, lyricLeft + lyricW)
-            lyricBubble.set(lyricLeft, pill.top, lyricRight, pill.bottom)
+            val width = min(lyricW, span)
+            val left = (target.centerX() - width / 2f).coerceIn(ui.edge.toFloat(), screenW - ui.edge - width)
+            val top = target.bottom + ui.s8
+            lyricBubble.set(left, top, left + width, top + d)
         }
 
         wantedKey = "$kind:${primary?.id}"
