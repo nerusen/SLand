@@ -197,7 +197,8 @@ class AssistantScene(
 
     private fun s(id: Int) = host.ctx.getString(id)
 
-    private val shown get() = ai.history.takeLast(TURNS)
+    private val shown: List<Assistant.Turn>
+        get() = ai.history.takeLast(TURNS)
 
     // One layout per turn, rebuilt only when the text or the width changes
     private val layouts = HashMap<String, StaticLayout>()
@@ -231,7 +232,7 @@ class AssistantScene(
 
     override fun drawPanel(c: Canvas, r: RectF, a: Float) {
         hits.clear()
-        val end = if (ai.busy) s(R.string.assistant_thinking) else Assistant.MODEL_LABELS[ai.model()]
+        val end: String? = if (ai.busy) s(R.string.assistant_thinking) else Assistant.MODEL_LABELS[ai.model()]
 
         if (!ai.configured) {
             val y = head(c, r, Icon.Flash, s(R.string.assistant), null, a)
@@ -248,10 +249,10 @@ class AssistantScene(
             return
         }
 
-        scrolled(c, r) { top ->
+        scrolled(c, r) { top: Float ->
             val rr = RectF(r.left, top, r.right, top + contentHeight(r.width()))
             var y = head(c, rr, Icon.Flash, s(R.string.assistant), end, a)
-            for (t in shown) {
+            for (t: Assistant.Turn in shown) {
                 val mine = t.role == "user"
                 ui.text(c, if (mine) s(R.string.assistant_you) else s(R.string.assistant_name),
                     ui.small, rr.left, ui.baseline(ui.small, y + ui.dp(7f)), rr.width(), a)
@@ -281,8 +282,8 @@ class AssistantScene(
 
     private fun ask() {
         if (ai.busy) return
-        host.input(host.ctx.getString(R.string.assistant_ask)) { text ->
-            ai.ask(text, wallet) { _answer, _error ->
+        host.input(host.ctx.getString(R.string.assistant_ask)) { text: String ->
+            ai.ask(text, wallet) { _answer: String?, _error: String? ->
                 resetScroll()
                 host.refresh()
             }
