@@ -35,6 +35,9 @@ class Media(context: Context, private val listener: ComponentName, private val c
     var playing = false
         private set
 
+    val shuffleEnabled get() = current?.shuffleMode == PlaybackState.SHUFFLE_MODE_ALL
+    val repeatMode get() = current?.repeatMode ?: PlaybackState.REPEAT_MODE_NONE
+
     private val sessions = MediaSessionManager.OnActiveSessionsChangedListener { list -> watch(list ?: emptyList()) }
 
     fun start() {
@@ -125,6 +128,21 @@ class Media(context: Context, private val listener: ComponentName, private val c
     fun next() { current?.transportControls?.skipToNext() }
 
     fun prev() { current?.transportControls?.skipToPrevious() }
+
+    fun toggleShuffle() {
+        current?.transportControls?.setShuffleMode(if (shuffleEnabled) PlaybackState.SHUFFLE_MODE_NONE else PlaybackState.SHUFFLE_MODE_ALL)
+        changed()
+    }
+
+    fun cycleRepeat() {
+        val next = when (repeatMode) {
+            PlaybackState.REPEAT_MODE_NONE -> PlaybackState.REPEAT_MODE_ALL
+            PlaybackState.REPEAT_MODE_ALL -> PlaybackState.REPEAT_MODE_ONE
+            else -> PlaybackState.REPEAT_MODE_NONE
+        }
+        current?.transportControls?.setRepeatMode(next)
+        changed()
+    }
 
     fun seek(ms: Long) { current?.transportControls?.seekTo(ms) }
 }

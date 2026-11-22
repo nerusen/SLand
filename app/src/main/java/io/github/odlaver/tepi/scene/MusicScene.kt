@@ -26,6 +26,7 @@ class MusicScene(host: Host, private val media: Media, private val prefs: Prefs,
     private var lyricIdx = -1
     private var lyricPrev = ""
     private val lyricT = Spring(1f, 0.004f, 260f, 32f)
+    private val rowWidthT = Spring(0f, 0.2f, 260f, 32f)
     private val playLevel = Spring(0f, 0.004f, 160f, 26f)
     private var wasPlaying = false
     private var pausedAt = 0L
@@ -34,6 +35,8 @@ class MusicScene(host: Host, private val media: Media, private val prefs: Prefs,
     private val hitPrev = RectF()
     private val hitPlay = RectF()
     private val hitNext = RectF()
+    private val hitShuffle = RectF()
+    private val hitRepeat = RectF()
     private val hitBar = RectF()
     private val hitInfo = RectF()
     private val hitLock = RectF()
@@ -113,7 +116,9 @@ class MusicScene(host: Host, private val media: Media, private val prefs: Prefs,
         playLevel.target = if (media.playing) 1f else 0f
         var moving = playLevel.step(dt)
         moving = lyricT.step(dt) or moving
-        if (updateLyric()) host.refresh()
+        val widthMoving = rowWidthT.step(dt)
+        moving = widthMoving or moving
+        if (updateLyric() || widthMoving) host.refresh()
         return moving
     }
 
@@ -155,24 +160,11 @@ class MusicScene(host: Host, private val media: Media, private val prefs: Prefs,
         bars(c, right.right - s / 2, right.centerY(), s * 0.8f, a)
     }
 
-    // One width for the whole song, not one per line. The island sizes the
-    // lyric bar from this, so measuring the current line would resize the
-    // shape on every line change: exactly where the eye is resting. Measured
-    // once when the song's lines arrive, then held.
-    private var rowW = 0f
-    private var rowWKey: String? = null
-
     override fun rowWidth(): Float {
-        val s = song
-        if (s == null || !prefs.lyrics || s.lines.isEmpty()) return 0f
-        if (rowLine() == null) return 0f
-        if (rowWKey != s.key) {
-            var widest = 0f
-            for (ln in s.lines) if (ln.text.isNotEmpty()) widest = maxOf(widest, ui.lyric.measureText(ln.text))
-            rowW = widest + ui.dp(40f)
-            rowWKey = s.key
-        }
-        return rowW
+        val line = rowLine()
+        val desired = line?.let { (ui.lyric.measureText(it) + ui.dp(40f)).coerceIn(ui.dp(120f), ui.dp(300f)) } ?: 0f
+        rowWidthT.target = desired
+        return rowWidthT.value
     }
 
     override fun drawRow(c: Canvas, r: RectF, a: Float) {
@@ -251,9 +243,16 @@ class MusicScene(host: Host, private val media: Media, private val prefs: Prefs,
         hitPrev.set(cx - gap - hit, cy - hit, cx - gap + hit, cy + hit)
         hitPlay.set(cx - hit, cy - hit, cx + hit, cy + hit)
         hitNext.set(cx + gap - hit, cy - hit, cx + gap + hit, cy + hit)
+        val modeGap = ui.dp(42f)
+        val modeHit = ui.dp(18f)
+        hitShuffle.set(cx + gap + modeGap - modeHit, cy - modeHit, cx + gap + modeGap + modeHit, cy + modeHit)
+        hitRepeat.set(cx + gap + modeGap * 2 - modeHit, cy - modeHit, cx + gap + modeGap * 2 + modeHit, cy + modeHit)
         ui.icon(c, io.github.odlaver.tepi.Icon.Prev, cx - gap, cy, ui.dp(22f), ui.ink, a)
         ui.icon(c, if (media.playing) io.github.odlaver.tepi.Icon.Pause else io.github.odlaver.tepi.Icon.Play, cx, cy, ui.dp(28f), ui.ink, a)
         ui.icon(c, io.github.odlaver.tepi.Icon.Next, cx + gap, cy, ui.dp(22f), ui.ink, a)
+        ui.icon(c, io.github.odlaver.tepi.Icon.Shuffle, hitShuffle.centerX(), cy, ui.dp(18f), if (media.shuffleEnabled) ui.lead else ui.sub, a)
+        val repeatIcon = if (media.repeatMode == android.media.session.PlaybackState.REPEAT_MODE_ONE) io.github.odlaver.tepi.Icon.RepeatOne else io.github.odlaver.tepi.Icon.Repeat
+        ui.icon(c, repeatIcon, hitRepeat.centerX(), cy, ui.dp(18f), if (media.repeatMode != android.media.session.PlaybackState.REPEAT_MODE_NONE) ui.lead else ui.sub, a)
 
         if (!hasLyrics()) return
         val lines = song?.lines ?: return
@@ -284,6 +283,8 @@ class MusicScene(host: Host, private val media: Media, private val prefs: Prefs,
             hitPlay.contains(x, y) -> media.toggle()
             hitPrev.contains(x, y) -> media.prev()
             hitNext.contains(x, y) -> media.next()
+            hitShuffle.contains(x, y) -> media.toggleShuffle()
+            hitRepeat.contains(x, y) -> media.cycleRepeat()
             hitBar.contains(x, y) -> media.track?.durationMs?.takeIf { it > 0 }?.let { d ->
                 media.seek((d * ((x - hitBar.left) / hitBar.width()).coerceIn(0f, 1f)).toLong())
             }

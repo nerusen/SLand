@@ -9,7 +9,7 @@ import android.graphics.RectF
 import android.graphics.drawable.Drawable
 
 enum class Icon {
-    Play, Pause, Next, Prev, Stop, Plus, Check, Close, Timer, Note, Gear, Home, Hide, Copy, Share, Open, Reply,
+    Play, Pause, Next, Prev, Shuffle, Repeat, RepeatOne, Stop, Plus, Check, Close, Timer, Note, Gear, Home, Hide, Copy, Share, Open, Reply,
     Flag, Music, Lyrics, Bell, Moon, Drop, Eye, Stretch, Bolt, Phone, Headphones, Download, Nav, Camera, Shield,
     Book, Tasks, Shelf, Info, Code, User, Battery, Layers, Hand, Power, Chat, Link, Pin, Trash, Laptop, Globe, Coffee, Chevron, Spark,
     Wifi, Bluetooth, Github, Volume, Mute, Image, Flash, Hotspot, Plane, Leaf, BellOff, Lock, Grid, Palette, Signal,
@@ -53,6 +53,8 @@ object Icons {
             Icon.Pause -> { fill(); rr(c, 6f, 4.5f, 10f, 19.5f, 1.2f); rr(c, 14f, 4.5f, 18f, 19.5f, 1.2f) }
             Icon.Next -> { fill(); poly(c, 5f, 5f, 15f, 12f, 5f, 19f, close = true); rr(c, 16.5f, 5f, 19f, 19f, 1f) }
             Icon.Prev -> { fill(); poly(c, 19f, 5f, 9f, 12f, 19f, 19f, close = true); rr(c, 5f, 5f, 7.5f, 19f, 1f) }
+            Icon.Shuffle -> { poly(c, 4f, 7f, 7f, 7f, 17f, 17f, 20f, 17f); poly(c, 17f, 7f, 20f, 7f, 20f, 10f); poly(c, 17f, 17f, 20f, 17f, 20f, 14f); ln(c, 4f, 17f, 7f, 17f); ln(c, 7f, 17f, 13f, 7f) }
+            Icon.Repeat, Icon.RepeatOne -> { r.set(5f, 6f, 19f, 18f); c.drawArc(r, 205f, 210f, false, p); poly(c, 16f, 5f, 20f, 6f, 17f, 9f); poly(c, 8f, 19f, 4f, 18f, 7f, 15f); if (i == Icon.RepeatOne) { p.style = Paint.Style.FILL; p.textSize = 6f; c.drawText("1", 10f, 14f, p) } }
             Icon.Stop -> { fill(); rr(c, 6f, 6f, 18f, 18f, 2.5f) }
             Icon.Plus -> { ln(c, 12f, 5f, 12f, 19f); ln(c, 5f, 12f, 19f, 12f) }
             Icon.Check -> poly(c, 5f, 12.5f, 10f, 17.5f, 19f, 7f)

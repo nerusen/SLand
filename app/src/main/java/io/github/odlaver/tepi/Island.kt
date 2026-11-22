@@ -707,16 +707,18 @@ class Island(
 
         midX.target = cx; wid.target = w; t.target = target.top; b.target = target.bottom
         neck.target = nk; split.target = sy; rad.target = rt; radB.target = rb
-        bubbleK.target = if (second != null || (primary?.id == "music" && (primary?.rowWidth() ?: 0f) > 0f)) 1f else 0f
+        bubbleK.target = if (kind == Kind.Compact && (second != null || (primary?.id == "music" && (primary?.rowWidth() ?: 0f) > 0f))) 1f else 0f
         val d = pill.height()
         bubble.set(target.right + ui.s8, pill.top, target.right + ui.s8 + d, pill.bottom)
-        lyricBubble.setEmpty()
-        val lyricW = if (primary?.id == "music") primary?.rowWidth() ?: 0f else 0f
-        if (lyricW > 0f) {
-            val width = min(lyricW, span)
-            val left = (target.centerX() - width / 2f).coerceIn(ui.edge.toFloat(), screenW - ui.edge - width)
-            val top = target.bottom + ui.s8
-            lyricBubble.set(left, top, left + width, top + d)
+        if (kind == Kind.Compact) {
+            lyricBubble.setEmpty()
+            val lyricW = if (primary?.id == "music") primary?.rowWidth() ?: 0f else 0f
+            if (lyricW > 0f) {
+                val width = min(lyricW, span)
+                val left = (target.centerX() - width / 2f).coerceIn(ui.edge.toFloat(), screenW - ui.edge - width)
+                val top = target.bottom + ui.s8
+                lyricBubble.set(left, top, left + width, top + d)
+            }
         }
 
         wantedKey = "$kind:${primary?.id}"
@@ -1193,6 +1195,11 @@ class Island(
     private var downY = 0f
     private var pressed = false
     private var acted = false
+    // The compact lyric capsule has no dismiss action. It is ignored as a
+    // separate upward swipe target, while a downward swipe still opens/expands
+    // the island exactly as it did before.
+    private var lyricGesture = false
+
     // Scene holding the current gesture, set when one claims the touch down
     private var dragger: Scene? = null
     // A hold inside an open panel goes to what is under the finger first.
@@ -1241,6 +1248,7 @@ class Island(
                 downY = e.rawY
                 pressed = true
                 acted = false
+                lyricGesture = kind == Kind.Compact && !lyricBubble.isEmpty && lyricBubble.contains(e.rawX, e.rawY)
                 // Something scrubbable under the finger, like the volume
                 // track, takes the whole gesture: no long press, no swipe,
                 // and no tap when it lifts
@@ -1260,7 +1268,11 @@ class Island(
                 val slop = ui.dp(24f)
                 when {
                     dy > slop && abs(dy) > abs(dx) -> { acted = true; main.removeCallbacks(longPress); swipeDown() }
-                    dy < -slop && abs(dy) > abs(dx) -> { acted = true; main.removeCallbacks(longPress); swipeUp() }
+                    dy < -slop && abs(dy) > abs(dx) -> {
+                        acted = true
+                        main.removeCallbacks(longPress)
+                        if (!lyricGesture) swipeUp()
+                    }
                     abs(dx) > ui.dp(48f) && kind == Kind.Panel -> { acted = true; main.removeCallbacks(longPress); page(if (dx < 0) 1 else -1) }
                 }
             }
