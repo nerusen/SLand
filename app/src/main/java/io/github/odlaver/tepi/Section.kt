@@ -28,8 +28,8 @@ class Section : Page() {
 
     // The island's colours.
     //
-    // Nine palettes, four of them grey and five of them combinations. The grey
-    // ones are the island as it was and are listed first; the combinations
+    // Monochrome palettes and combinations. The monochrome palettes are the
+    // island as it was and are listed first; the combinations
     // name a ground and an accent, and the accent is what a primary button, a
     // lit tile, the current page's mark and the logo are painted with. Body
     // text stays white in all nine, which is why there is no contrast warning
@@ -61,7 +61,7 @@ class Section : Page() {
     }
 
     // What the palette is made of, said in words: a combination theme is a
-    // ground plus an accent, and which is which is the thing a swatch alone
+    // ground plus accent tones, and which is which is the thing a swatch alone
     // cannot tell you
     private fun swatchText(t: Theme) =
         if (t.coloured) getString(R.string.th_combo) else getString(R.string.th_plain)
@@ -78,7 +78,7 @@ class Section : Page() {
         val tones = ArrayList<Int>()
         tones.add(t.back)
         if (t.tier != 0) tones.add(t.tier)
-        tones.add(android.graphics.Color.WHITE)
+        if (t.lift != 0) tones.add(t.lift)
         if (t.coloured) tones.add(t.mark)
         for (c in tones) {
             row.addView(android.view.View(this).apply {
@@ -154,6 +154,33 @@ class Section : Page() {
             slider(c, getString(R.string.idle_width), Prefs.IDLE_WIDTH_MIN, Prefs.IDLE_WIDTH_MAX, prefs.idleWidthDp, { "$it dp" }, Icon.Chevron) {
                 prefs.idleWidthDp = it
                 changed()
+            }
+            toggle(c, getString(R.string.island_shadow), getString(R.string.island_shadow_sub), prefs.islandShadow, icon = Icon.Layers) {
+                prefs.islandShadow = it
+                changed()
+            }
+            choice(c, getString(R.string.logo_title),
+                listOf("author" to getString(R.string.logo_author), "none" to getString(R.string.logo_none)),
+                prefs.logoMode, Icon.Palette) {
+                prefs.logoMode = it
+                changed()
+                rebuild()
+            }
+            toggle(c, getString(R.string.greeting_title), getString(R.string.greeting_sub), prefs.greetingEnabled, icon = Icon.Chat) {
+                prefs.greetingEnabled = it
+                changed()
+                rebuild()
+            }
+            if (prefs.greetingEnabled) {
+                val name = field(getString(R.string.greeting_name_hint), value = prefs.greetingName)
+                name.inputType = android.text.InputType.TYPE_CLASS_TEXT
+                name.maxLines = 1
+                form(c, name, button(getString(R.string.save)) {
+                    prefs.greetingName = name.text.toString().trim()
+                    changed()
+                    toast(getString(R.string.saved))
+                })
+                note(getString(R.string.greeting_name_note, Prefs.GREETING_NAME_MAX))
             }
             // What the capsule carries where the battery used to be. The list
             // is in Badge, in the order it is offered, so the page and the

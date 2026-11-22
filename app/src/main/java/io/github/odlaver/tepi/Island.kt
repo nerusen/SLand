@@ -147,10 +147,15 @@ class Island(
     // a stiffer or softer spring here would let the bar drift away from the
     // edge it is supposed to be riding.
     private val navA = Spring(0f, 0.004f, 380f, 32f)
+    private val greetingA = Spring(0f, 0.004f, 620f, 42f)
+    private val greetingW = Spring(0f, 0.004f, 620f, 42f)
     private val now = RectF()
     private val target = RectF()
     private val bubble = RectF()
     private val lyricBubble = RectF()
+    private val greetingBubble = RectF()
+    private var greetingVisible = false
+    private var greetingDisplayUntil = 0L
 
     // State
     private var kind = Kind.Hidden
@@ -181,6 +186,7 @@ class Island(
     private var pageList: List<Scene> = emptyList()
 
     private val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = ui.back }
+    private val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = ui.back }
     private val shape = Path()
     private val tierA = Path()
     private val tierB = Path()
@@ -206,12 +212,14 @@ class Island(
 
     fun attach() {
         if (attached) return
+        seedShadow()
         measureScreen()
         midX.snap(hole.centerX()); wid.snap(hole.width()); t.snap(hole.top); b.snap(hole.bottom); rad.snap(hole.height() / 2)
         neck.snap(hole.width()); split.snap(hole.top); radB.snap(hole.height() / 2)
         place(hole, false)
         wm.addView(this, lp)
         attached = true
+        armGreeting()
         try {
             context.applicationContext.registerReceiver(lockWatch, android.content.IntentFilter().apply {
                 addAction(Intent.ACTION_SCREEN_ON); addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_USER_PRESENT)
@@ -229,6 +237,11 @@ class Island(
 
     fun detach() {
         if (!attached) return
+        main.removeCallbacks(greetingTick)
+        main.removeCallbacks(hideGreeting)
+        greetingVisible = false
+        greetingA.snap(0f)
+        greetingW.snap(0f)
         input?.close()
         notch?.hide()
         notch = null
@@ -283,9 +296,51 @@ class Island(
         // island was torn down and put back up
         ui.reseed()
         bg.color = ui.back
+        shadow.color = ui.back
+        seedShadow()
+        if (!prefs.greetingEnabled) {
+            greetingVisible = false
+            main.removeCallbacks(greetingTick)
+            main.removeCallbacks(hideGreeting)
+        } else armGreeting()
         measureScreen()
         music.reload()
         refresh()
+    }
+
+    private fun seedShadow() {
+        if (prefs.islandShadow) {
+            shadow.setShadowLayer(ui.dp(8f), 0f, ui.dp(3f), android.graphics.Color.argb(58, 0, 0, 0))
+        } else {
+            shadow.clearShadowLayer()
+        }
+    }
+
+    private fun armGreeting() {
+        main.removeCallbacks(greetingTick)
+        if (attached && prefs.greetingEnabled && prefs.greetingName.isNotBlank()) {
+            main.postDelayed(greetingTick, GREETING_INTERVAL_MS)
+        }
+    }
+
+    private val greetingTick = Runnable {
+        if (!prefs.greetingEnabled || prefs.greetingName.isBlank()) {
+            armGreeting()
+            return@Runnable
+        }
+        greetingVisible = true
+        greetingDisplayUntil = SystemClock.uptimeMillis() + GREETING_SHOW_MS
+        refresh()
+        main.removeCallbacks(hideGreeting)
+        main.postDelayed(hideGreeting, GREETING_SHOW_MS)
+        main.postDelayed(greetingTick, GREETING_INTERVAL_MS)
+    }
+
+    private val hideGreeting = Runnable {
+        if (SystemClock.uptimeMillis() >= greetingDisplayUntil - 100) {
+            greetingVisible = false
+            refresh()
+        }
     }
 
     // Pages that hold a system resource while they are on screen are told
@@ -720,6 +775,18 @@ class Island(
                 lyricBubble.set(left, top, left + width, top + d)
             }
         }
+        greetingBubble.setEmpty()
+        val greetingOn = greetingVisible && kind == Kind.Idle && prefs.greetingEnabled && prefs.greetingName.isNotBlank()
+        if (greetingOn) {
+            val text = "Hi, ${prefs.greetingName}"
+            val wanted = ui.compact.measureText(text) + ui.s16 * 2
+            val width = min(max(pill.width(), wanted), span)
+            val left = (target.centerX() - width / 2f).coerceIn(ui.edge.toFloat(), screenW - ui.edge - width)
+            val top = target.bottom + ui.s8
+            greetingBubble.set(left, top, left + width, top + d)
+        }
+        greetingW.target = if (greetingOn) greetingBubble.width() else 0f
+        greetingA.target = if (greetingOn) 1f else 0f
 
         wantedKey = "$kind:${primary?.id}"
         if (wantedKey != shownKey) contentA.target = 0f
@@ -732,6 +799,7 @@ class Island(
         union.union(midX.value - wid.value / 2, t.value, midX.value + wid.value / 2, b.value)
         if (second != null || bubbleK.value > 0.01f) union.union(bubble)
         if (!lyricBubble.isEmpty) union.union(lyricBubble)
+        if (greetingOn) union.union(greetingBubble)
         place(union, wantsTouch())
         kick()
     }
@@ -792,6 +860,8 @@ class Island(
         moving = contentA.step(dt) or moving
         moving = idleA.step(dt) or moving
         moving = navA.step(dt) or moving
+        moving = greetingA.step(dt) or moving
+        moving = greetingW.step(dt) or moving
         if (contentA.value <= 0.05f && contentA.target == 0f) {
             shownKey = wantedKey
             shownScene = primary
@@ -821,10 +891,15 @@ class Island(
             // nothing rather than holding a surface over it
             Kind.Hidden -> if (landscape) place(target, false)
             else place(if (hotspot()) pill else hole, hotspot())
-            Kind.Idle -> place(target, wantsTouch())
+            Kind.Idle -> {
+                val rect = RectF(target)
+                if (greetingVisible) rect.union(greetingBubble)
+                place(rect, wantsTouch())
+            }
             else -> {
                 val rect = RectF(target)
                 if (second != null) rect.union(bubble)
+                if (greetingVisible && kind == Kind.Idle) rect.union(greetingBubble)
                 place(rect, true)
             }
         }
@@ -849,6 +924,13 @@ class Island(
             if (second != null) shape.addCircle(bubble.centerX(), bubble.centerY(), pill.height() / 2 * k, Path.Direction.CW)
             if (!lyricBubble.isEmpty) shape.addRoundRect(lyricBubble, lyricBubble.height() / 2, lyricBubble.height() / 2, Path.Direction.CW)
         }
+        val ga = greetingA.value.coerceIn(0f, 1f)
+        if (ga > 0.01f && greetingVisible && kind == Kind.Idle && !greetingBubble.isEmpty) {
+            val gw = greetingW.value.coerceIn(0f, greetingBubble.width()).coerceAtLeast(pill.height() * ga)
+            box.set(greetingBubble.centerX() - gw / 2, greetingBubble.top, greetingBubble.centerX() + gw / 2, greetingBubble.bottom)
+            shape.addRoundRect(box, box.height() / 2, box.height() / 2, Path.Direction.CW)
+        }
+        if (prefs.islandShadow) canvas.drawPath(shape, shadow)
         canvas.drawPath(shape, bg)
         canvas.clipPath(shape)
         val a = contentA.value.coerceIn(0f, 1f)
@@ -888,6 +970,11 @@ class Island(
         // scene. Clipped to the capsule, so a half-grown shape cannot leak it.
         val ia = idleA.value.coerceIn(0f, 1f)
         if (ia > 0.01f) drawIdleChrome(canvas, ia)
+        if (ga > 0.01f && greetingVisible && kind == Kind.Idle && !greetingBubble.isEmpty) {
+            val gw = greetingW.value.coerceIn(0f, greetingBubble.width()).coerceAtLeast(pill.height() * ga)
+            box.set(greetingBubble.centerX() - gw / 2, greetingBubble.top, greetingBubble.centerX() + gw / 2, greetingBubble.bottom)
+            ui.centered(c = canvas, s = "Hi, ${prefs.greetingName}", p = ui.compact, cx = box.centerX(), cy = box.centerY(), width = box.width() - ui.s16, a = ga)
+        }
         canvas.restore()
     }
 
@@ -1023,7 +1110,7 @@ class Island(
         val top = now.centerY() - h / 2
 
         val logoL = now.left + inset
-        if (logoL + h * Ui.LOGO_ASPECT <= hole.left - ui.s8) {
+        if (prefs.logoMode == "author" && logoL + h * Ui.LOGO_ASPECT <= hole.left - ui.s8) {
             box.set(logoL, top, logoL + h * Ui.LOGO_ASPECT, top + h)
             // The mark takes the theme's accent where there is one. A logo is
             // the one piece of chrome that is supposed to be the brand's
@@ -1373,6 +1460,8 @@ class Island(
 
     companion object {
         private const val CLOSE_MS = 9000L
+        private const val GREETING_INTERVAL_MS = 20 * 60 * 1000L
+        private const val GREETING_SHOW_MS = 5000L
         // Tab bar: how tall, and how long it stays up after the last nudge
         private const val NAV_H = 36f
         private const val NAV_MS = 4500L

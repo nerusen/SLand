@@ -115,6 +115,22 @@ class Theme(
             Theme("dark", R.string.th_dark, Color.rgb(0x0A, 0x0A, 0x0A)),
             Theme("darkgray", R.string.th_dark_gray, Color.rgb(0x17, 0x17, 0x17)),
             Theme("gray", R.string.th_gray, Color.rgb(0x26, 0x26, 0x26)),
+            Theme(
+                "pinky", R.string.th_pinky, Color.rgb(0xDA, 0x1C, 0x5C),
+                tier = Color.rgb(0xFF, 0x64, 0xAD), lift = Color.rgb(0xFF, 0xA3, 0xCE),
+                accent = Color.rgb(0xF6, 0xF1, 0xEB),
+            ),
+            Theme("redoled", R.string.th_red_oled, Color.rgb(0x00, 0x00, 0x00), accent = Color.rgb(0xFF, 0x00, 0x00)),
+            Theme(
+                "matcha", R.string.th_matcha, Color.rgb(0x39, 0x54, 0x42),
+                tier = Color.rgb(0x87, 0x9B, 0x74), lift = Color.rgb(0xC9, 0xD8, 0xA5),
+                accent = Color.rgb(0xF2, 0xEB, 0xD8),
+            ),
+            Theme(
+                "electricblue", R.string.th_electric_blue, Color.rgb(0x00, 0x00, 0x29),
+                tier = Color.rgb(0x17, 0x3D, 0xED), lift = Color.rgb(0xDC, 0xDE, 0xE2),
+                accent = Color.rgb(0x17, 0x3D, 0xED),
+            ),
             Theme("royal", R.string.th_royal, Color.rgb(0x00, 0x55, 0xFF), accent = Color.rgb(0xB5, 0xF8, 0x00)),
             Theme(
                 "violet", R.string.th_violet, Color.rgb(0x0F, 0x03, 0x2D),

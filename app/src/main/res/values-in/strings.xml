@@ -455,6 +455,10 @@
     <string name="th_midnight">Midnight Blue</string>
     <string name="th_crimson">Crimson</string>
     <string name="th_neon">Neon</string>
+    <string name="th_pinky">Pinky</string>
+    <string name="th_red_oled">Red Oled</string>
+    <string name="th_matcha">Matcha</string>
+    <string name="th_electric_blue">Electric Blue</string>
 
     <!-- Halaman dan pemberitahuan yang ditawarkan island -->
     <string name="tabs_title">Halaman dan pemberitahuan</string>
@@ -485,6 +489,15 @@
     <string name="badge_text_note">Maksimal %1$d karakter, dan dipotong dengan … jika capsule terlalu sempit. Lebarkan capsule di atas dan lebih banyak yang tampil.</string>
     <string name="badge_cpu_note">Android menutup /proc untuk aplikasi sejak versi 8, jadi angka CPU tidak tersedia di banyak ponsel. Bila ditolak, capsule menampilkan kosong daripada angka karangan.</string>
     <string name="badge_name_note">Dipotong dengan … bila nama lebih panjang daripada capsule. Lebarkan capsule di atas dan lebih banyak yang tampil. Nama Wi-Fi dan Bluetooth butuh izin di bagian Nama di atas.</string>
+    <string name="island_shadow">Bayangan island</string>
+    <string name="island_shadow_sub">Bayangan Drop Shadow lembut ke bawah pada capsule diam dan island terbuka.</string>
+    <string name="logo_title">Logo capsule diam</string>
+    <string name="logo_author">Author</string>
+    <string name="logo_none">None</string>
+    <string name="greeting_title">Sapaan berkala</string>
+    <string name="greeting_sub">Menampilkan Hi, nama di bawah capsule diam setiap 20 menit.</string>
+    <string name="greeting_name_hint">Nama Anda</string>
+    <string name="greeting_name_note">Maksimal %1$d karakter. Teks sapaan selalu putih di semua tema.</string>
     <string name="saved">Tersimpan</string>
 
     <!-- Mata bergoyang mengikuti musik -->

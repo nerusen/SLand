@@ -458,6 +458,10 @@
     <string name="th_midnight">Midnight Blue</string>
     <string name="th_crimson">Crimson</string>
     <string name="th_neon">Neon</string>
+    <string name="th_pinky">Pinky</string>
+    <string name="th_red_oled">Red Oled</string>
+    <string name="th_matcha">Matcha</string>
+    <string name="th_electric_blue">Electric Blue</string>
 
     <!-- Which pages and notices the island offers -->
     <string name="tabs_title">Pages and notices</string>
@@ -488,6 +492,15 @@
     <string name="badge_text_note">Up to %1$d characters, and shortened with a … when the capsule is too narrow for all of it. Make the capsule wider above and more of it shows.</string>
     <string name="badge_cpu_note">Android closed /proc to apps in version 8, so the CPU figure is missing on many phones. Where it is refused the capsule simply shows nothing rather than a made-up number.</string>
     <string name="badge_name_note">Shortened with a … when the name is longer than the capsule. Make the capsule wider above and more of it shows. Wi-Fi and Bluetooth names need the permission in Names, above.</string>
+    <string name="island_shadow">Island drop shadow</string>
+    <string name="island_shadow_sub">A soft downward shadow on the resting capsule and open island.</string>
+    <string name="logo_title">Resting capsule logo</string>
+    <string name="logo_author">Author</string>
+    <string name="logo_none">None</string>
+    <string name="greeting_title">Periodic greeting</string>
+    <string name="greeting_sub">Shows Hi, name below the resting capsule every 20 minutes.</string>
+    <string name="greeting_name_hint">Your name</string>
+    <string name="greeting_name_note">Up to %1$d characters. The greeting stays white for every theme.</string>
     <string name="saved">Saved</string>
 
     <!-- The eyes sway to whatever is playing -->

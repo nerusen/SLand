@@ -58,6 +58,22 @@ class Prefs(context: Context) {
         get() = int("idle.width", IDLE_WIDTH_DEFAULT)
         set(v) = set("idle.width", v)
 
+    var islandShadow: Boolean
+        get() = bool("island.shadow", true)
+        set(v) = set("island.shadow", v)
+
+    var logoMode: String
+        get() = str("idle.logo", "author")
+        set(v) = set("idle.logo", if (v == "none") "none" else "author")
+
+    var greetingEnabled: Boolean
+        get() = bool("greeting.enabled", false)
+        set(v) = set("greeting.enabled", v)
+
+    var greetingName: String
+        get() = str("greeting.name", "")
+        set(v) = set("greeting.name", v.trim().take(GREETING_NAME_MAX))
+
     // Tab bar in an open panel: pinned up, or shown on a page change and
     // stepped back after a few seconds. Automatic by default.
     var navAlways: Boolean
@@ -166,6 +182,8 @@ class Prefs(context: Context) {
         const val IDLE_WIDTH_DEFAULT = 150
         const val IDLE_WIDTH_MIN = 90
         const val IDLE_WIDTH_MAX = 260
+
+        const val GREETING_NAME_MAX = 24
 
         // Notch size, per cent of the default 26 x 100 dp block.
         //
