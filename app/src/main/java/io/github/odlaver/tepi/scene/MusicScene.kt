@@ -251,8 +251,8 @@ class MusicScene(host: Host, private val media: Media, private val prefs: Prefs,
         ui.icon(c, if (media.playing) io.github.odlaver.tepi.Icon.Pause else io.github.odlaver.tepi.Icon.Play, cx, cy, ui.dp(28f), ui.ink, a)
         ui.icon(c, io.github.odlaver.tepi.Icon.Next, cx + gap, cy, ui.dp(22f), ui.ink, a)
         ui.icon(c, io.github.odlaver.tepi.Icon.Shuffle, hitShuffle.centerX(), cy, ui.dp(18f), if (media.shuffleEnabled) ui.lead else ui.sub, a)
-        val repeatIcon = if (media.repeatMode == android.media.session.PlaybackState.REPEAT_MODE_ONE) io.github.odlaver.tepi.Icon.RepeatOne else io.github.odlaver.tepi.Icon.Repeat
-        ui.icon(c, repeatIcon, hitRepeat.centerX(), cy, ui.dp(18f), if (media.repeatMode != android.media.session.PlaybackState.REPEAT_MODE_NONE) ui.lead else ui.sub, a)
+        val repeatIcon = if (media.repeatOne) io.github.odlaver.tepi.Icon.RepeatOne else io.github.odlaver.tepi.Icon.Repeat
+        ui.icon(c, repeatIcon, hitRepeat.centerX(), cy, ui.dp(18f), if (media.repeatActive) ui.lead else ui.sub, a)
 
         if (!hasLyrics()) return
         val lines = song?.lines ?: return

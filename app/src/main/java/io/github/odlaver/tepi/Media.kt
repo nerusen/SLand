@@ -35,8 +35,10 @@ class Media(context: Context, private val listener: ComponentName, private val c
     var playing = false
         private set
 
-    val shuffleEnabled get() = current?.shuffleMode == PlaybackState.SHUFFLE_MODE_ALL
-    val repeatMode get() = current?.repeatMode ?: PlaybackState.REPEAT_MODE_NONE
+    val shuffleEnabled get() = current?.getShuffleMode() == SHUFFLE_ALL
+    val repeatMode get() = current?.getRepeatMode() ?: REPEAT_NONE
+    val repeatOne get() = repeatMode == REPEAT_ONE
+    val repeatActive get() = repeatMode != REPEAT_NONE
 
     private val sessions = MediaSessionManager.OnActiveSessionsChangedListener { list -> watch(list ?: emptyList()) }
 
@@ -67,6 +69,8 @@ class Media(context: Context, private val listener: ComponentName, private val c
             val cb = object : MediaController.Callback() {
                 override fun onPlaybackStateChanged(state: PlaybackState?) = pick()
                 override fun onMetadataChanged(metadata: MediaMetadata?) = pick()
+                override fun onRepeatModeChanged(repeatMode: Int) = changed()
+                override fun onShuffleModeChanged(shuffleMode: Int) = changed()
                 override fun onSessionDestroyed() = pick()
             }
             c.registerCallback(cb, main)
@@ -130,19 +134,27 @@ class Media(context: Context, private val listener: ComponentName, private val c
     fun prev() { current?.transportControls?.skipToPrevious() }
 
     fun toggleShuffle() {
-        current?.transportControls?.setShuffleMode(if (shuffleEnabled) PlaybackState.SHUFFLE_MODE_NONE else PlaybackState.SHUFFLE_MODE_ALL)
+        current?.transportControls?.setShuffleMode(if (shuffleEnabled) SHUFFLE_NONE else SHUFFLE_ALL)
         changed()
     }
 
     fun cycleRepeat() {
         val next = when (repeatMode) {
-            PlaybackState.REPEAT_MODE_NONE -> PlaybackState.REPEAT_MODE_ALL
-            PlaybackState.REPEAT_MODE_ALL -> PlaybackState.REPEAT_MODE_ONE
-            else -> PlaybackState.REPEAT_MODE_NONE
+            REPEAT_NONE -> REPEAT_ALL
+            REPEAT_ALL -> REPEAT_ONE
+            else -> REPEAT_NONE
         }
         current?.transportControls?.setRepeatMode(next)
         changed()
     }
 
     fun seek(ms: Long) { current?.transportControls?.seekTo(ms) }
+
+    companion object {
+        private const val SHUFFLE_NONE = 0
+        private const val SHUFFLE_ALL = 2
+        private const val REPEAT_NONE = 0
+        private const val REPEAT_ALL = 2
+        private const val REPEAT_ONE = 1
+    }
 }

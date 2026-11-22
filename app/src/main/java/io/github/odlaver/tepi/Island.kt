@@ -1278,14 +1278,16 @@ class Island(
             }
             MotionEvent.ACTION_UP -> {
                 main.removeCallbacks(longPress)
-                dragger?.let { it.release(); dragger = null; pressed = false; return true }
+                dragger?.let { it.release(); dragger = null; pressed = false; lyricGesture = false; return true }
                 if (pressed && !acted && hypot(e.rawX - downX, e.rawY - downY) < ui.dp(12f)) tap(e.rawX, e.rawY)
                 pressed = false
+                lyricGesture = false
             }
             MotionEvent.ACTION_CANCEL -> {
                 main.removeCallbacks(longPress)
                 dragger?.let { it.release(); dragger = null }
                 pressed = false
+                lyricGesture = false
             }
         }
         return true
