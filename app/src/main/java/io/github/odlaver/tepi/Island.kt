@@ -310,7 +310,9 @@ class Island(
 
     private fun seedShadow() {
         if (prefs.islandShadow) {
-            shadow.setShadowLayer(ui.dp(8f), 0f, ui.dp(3f), android.graphics.Color.argb(58, 0, 0, 0))
+            val alpha = (255f * prefs.shadowOpacity.coerceIn(Prefs.SHADOW_OPACITY_MIN, Prefs.SHADOW_OPACITY_MAX) / 100f).toInt()
+            if (alpha <= 0) shadow.clearShadowLayer()
+            else shadow.setShadowLayer(ui.dp(8f), 0f, ui.dp(3f), android.graphics.Color.argb(alpha, 0, 0, 0))
         } else {
             shadow.clearShadowLayer()
         }

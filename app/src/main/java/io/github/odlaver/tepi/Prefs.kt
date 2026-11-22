@@ -62,6 +62,15 @@ class Prefs(context: Context) {
         get() = bool("island.shadow", true)
         set(v) = set("island.shadow", v)
 
+    var shadowPreset: String
+        get() = str("island.shadow.preset", "soft")
+        set(v) = set("island.shadow.preset",
+            if (v in setOf("soft", "balanced", "strong", "custom")) v else "soft")
+
+    var shadowOpacity: Int
+        get() = int("island.shadow.opacity", SHADOW_OPACITY_SOFT).coerceIn(SHADOW_OPACITY_MIN, SHADOW_OPACITY_MAX)
+        set(v) = set("island.shadow.opacity", v.coerceIn(SHADOW_OPACITY_MIN, SHADOW_OPACITY_MAX))
+
     var logoMode: String
         get() = str("idle.logo", "author")
         set(v) = set("idle.logo", if (v == "none") "none" else "author")
@@ -184,6 +193,12 @@ class Prefs(context: Context) {
         const val IDLE_WIDTH_MAX = 260
 
         const val GREETING_NAME_MAX = 24
+
+        const val SHADOW_OPACITY_MIN = 0
+        const val SHADOW_OPACITY_MAX = 100
+        const val SHADOW_OPACITY_SOFT = 25
+        const val SHADOW_OPACITY_BALANCED = 50
+        const val SHADOW_OPACITY_STRONG = 75
 
         // Notch size, per cent of the default 26 x 100 dp block.
         //

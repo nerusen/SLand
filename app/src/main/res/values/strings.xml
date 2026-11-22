@@ -494,6 +494,12 @@
     <string name="badge_name_note">Shortened with a … when the name is longer than the capsule. Make the capsule wider above and more of it shows. Wi-Fi and Bluetooth names need the permission in Names, above.</string>
     <string name="island_shadow">Island drop shadow</string>
     <string name="island_shadow_sub">A soft downward shadow on the resting capsule and open island.</string>
+    <string name="shadow_intensity">Shadow intensity</string>
+    <string name="shadow_soft">Soft preset · 25%</string>
+    <string name="shadow_balanced">Balanced preset · 50%</string>
+    <string name="shadow_strong">Strong preset · 75%</string>
+    <string name="shadow_custom">Custom</string>
+    <string name="shadow_opacity">Shadow opacity</string>
     <string name="logo_title">Resting capsule logo</string>
     <string name="logo_author">Author</string>
     <string name="logo_none">None</string>

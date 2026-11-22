@@ -159,6 +159,33 @@ class Section : Page() {
                 prefs.islandShadow = it
                 changed()
             }
+            if (prefs.islandShadow) {
+                choice(c, getString(R.string.shadow_intensity),
+                    listOf(
+                        "soft" to getString(R.string.shadow_soft),
+                        "balanced" to getString(R.string.shadow_balanced),
+                        "strong" to getString(R.string.shadow_strong),
+                        "custom" to getString(R.string.shadow_custom),
+                    ),
+                    prefs.shadowPreset, Icon.Layers) { preset ->
+                        prefs.shadowPreset = preset
+                        when (preset) {
+                            "soft" -> prefs.shadowOpacity = Prefs.SHADOW_OPACITY_SOFT
+                            "balanced" -> prefs.shadowOpacity = Prefs.SHADOW_OPACITY_BALANCED
+                            "strong" -> prefs.shadowOpacity = Prefs.SHADOW_OPACITY_STRONG
+                        }
+                        changed()
+                        rebuild()
+                    }
+                if (prefs.shadowPreset == "custom") {
+                    slider(c, getString(R.string.shadow_opacity), Prefs.SHADOW_OPACITY_MIN, Prefs.SHADOW_OPACITY_MAX,
+                        prefs.shadowOpacity, { "$it%" }, Icon.Layers) {
+                        prefs.shadowOpacity = it
+                        prefs.shadowPreset = "custom"
+                        changed()
+                    }
+                }
+            }
             choice(c, getString(R.string.logo_title),
                 listOf("author" to getString(R.string.logo_author), "none" to getString(R.string.logo_none)),
                 prefs.logoMode, Icon.Palette) {
