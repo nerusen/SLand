@@ -35,8 +35,8 @@ class Media(context: Context, private val listener: ComponentName, private val c
     var playing = false
         private set
 
-    val shuffleEnabled get() = current?.getShuffleMode() == SHUFFLE_ALL
-    val repeatMode get() = current?.getRepeatMode() ?: REPEAT_NONE
+    val shuffleEnabled get() = readMode("getShuffleMode") == SHUFFLE_ALL
+    val repeatMode get() = readMode("getRepeatMode")
     val repeatOne get() = repeatMode == REPEAT_ONE
     val repeatActive get() = repeatMode != REPEAT_NONE
 
@@ -69,8 +69,6 @@ class Media(context: Context, private val listener: ComponentName, private val c
             val cb = object : MediaController.Callback() {
                 override fun onPlaybackStateChanged(state: PlaybackState?) = pick()
                 override fun onMetadataChanged(metadata: MediaMetadata?) = pick()
-                override fun onRepeatModeChanged(repeatMode: Int) = changed()
-                override fun onShuffleModeChanged(shuffleMode: Int) = changed()
                 override fun onSessionDestroyed() = pick()
             }
             c.registerCallback(cb, main)
@@ -134,7 +132,7 @@ class Media(context: Context, private val listener: ComponentName, private val c
     fun prev() { current?.transportControls?.skipToPrevious() }
 
     fun toggleShuffle() {
-        current?.transportControls?.setShuffleMode(if (shuffleEnabled) SHUFFLE_NONE else SHUFFLE_ALL)
+        setMode(current?.transportControls, "setShuffleMode", if (shuffleEnabled) SHUFFLE_NONE else SHUFFLE_ALL)
         changed()
     }
 
@@ -144,11 +142,30 @@ class Media(context: Context, private val listener: ComponentName, private val c
             REPEAT_ALL -> REPEAT_ONE
             else -> REPEAT_NONE
         }
-        current?.transportControls?.setRepeatMode(next)
+        setMode(current?.transportControls, "setRepeatMode", next)
         changed()
     }
 
     fun seek(ms: Long) { current?.transportControls?.seekTo(ms) }
+
+    private fun readMode(method: String): Int {
+        val c = current ?: return REPEAT_NONE
+        return try {
+            c.javaClass.getMethod(method).invoke(c) as? Int ?: REPEAT_NONE
+        } catch (_: Exception) {
+            REPEAT_NONE
+        }
+    }
+
+    private fun setMode(objectName: Any?, method: String, mode: Int): Boolean {
+        val value = objectName ?: return false
+        return try {
+            value.javaClass.getMethod(method, Int::class.javaPrimitiveType).invoke(value, mode)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     companion object {
         private const val SHUFFLE_NONE = 0
