@@ -827,16 +827,21 @@ class Island(
     // Window covers the moving shape only
     private fun place(rect: RectF, touch: Boolean) {
         val grow = if (touch && (kind == Kind.Hidden || kind == Kind.Idle)) ui.s8 else 0f
+        // The drop shadow extends beyond the painted path: a window that ends
+        // on the capsule edge clips the blur before it can fade out. Reserve
+        // enough room for the 8 dp blur and 3 dp downward distance on every
+        // side, including the bottom edge where it is most visible.
+        val shadowRoom = if (prefs.islandShadow) ui.dp(12f) else 0f
         // Sideways the shape flares outside its own box at the top corners, so
         // the window has to carry that much slack on each side or the flare is
         // clipped off at exactly the join it exists to hide
-        val side = grow + if (landscape) ui.glassFlare else 0f
+        val side = grow + shadowRoom + if (landscape) ui.glassFlare else 0f
         val x = (rect.left - side).toInt() - 2
-        val y = max(0, (rect.top - grow).toInt() - 2)
+        val y = max(0, (rect.top - grow - shadowRoom).toInt() - 2)
         lp.x = x
         lp.y = y
         lp.width = max(1, (rect.right + side).toInt() + 2 - x)
-        lp.height = max(1, (rect.bottom + grow).toInt() + 2 - y)
+        lp.height = max(1, (rect.bottom + grow + shadowRoom).toInt() + 2 - y)
         lp.flags = baseFlags or if (touch) 0 else WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
         if (attached) wm.updateViewLayout(this, lp)
     }
