@@ -129,6 +129,11 @@ class Listener : NotificationListenerService() {
         instance = this
         connected = true
         media = Media(this, ComponentName(this, Listener::class.java)) { island?.mediaChanged() }.also { it.start() }
+        // Notification listener access can disconnect while the settings app is
+        // closed or while Android restarts the process. Reconnecting must
+        // restart the enabled features and rebuild the overlay; otherwise the
+        // island stays invisible until MainActivity happens to call ensureIsland().
+        applyEnabled()
     }
 
     // Start or pause everything after the master switch
@@ -171,6 +176,15 @@ class Listener : NotificationListenerService() {
     override fun onListenerDisconnected() {
         connected = false
         teardown()
+        if (prefs.enabled) {
+            android.os.Handler(mainLooper).postDelayed({
+                if (!connected) {
+                    try {
+                        NotificationListenerService.requestRebind(ComponentName(this, Listener::class.java))
+                    } catch (_: Exception) { }
+                }
+            }, REBIND_DELAY_MS)
+        }
     }
 
     override fun onDestroy() {
@@ -583,6 +597,7 @@ class Listener : NotificationListenerService() {
     }
 
     companion object {
+        private const val REBIND_DELAY_MS = 2000L
         var instance: Listener? = null
             private set
 

@@ -18,8 +18,8 @@ android {
         applicationId = "com.nelsencreative.sland"
         minSdk = 29
         targetSdk = 36
-        versionCode = 12
-        versionName = "2.3.2"
+        versionCode = 13
+        versionName = "2.3.3"
         // Modern phones only; keeps ML Kit's native code small
         ndk { abiFilters += listOf("arm64-v8a") }
         // Where Check for updates and Source code point; must match the
