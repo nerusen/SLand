@@ -323,7 +323,7 @@ class Island(
         }
     }
 
-    private val greetingTick = Runnable {
+    private val greetingTick: Runnable = Runnable {
         if (!prefs.greetingEnabled || prefs.greetingName.isBlank()) {
             armGreeting()
             return@Runnable
@@ -336,7 +336,7 @@ class Island(
         main.postDelayed(greetingTick, GREETING_INTERVAL_MS)
     }
 
-    private val hideGreeting = Runnable {
+    private val hideGreeting: Runnable = Runnable {
         if (SystemClock.uptimeMillis() >= greetingDisplayUntil - 100) {
             greetingVisible = false
             refresh()
