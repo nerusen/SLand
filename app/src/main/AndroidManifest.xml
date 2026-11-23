@@ -7,20 +7,44 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <!-- Home's Wi-Fi and Bluetooth tiles: radio state, network name, earbud battery -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Android hides the SSID from apps without location access -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
+    <!--
+      The Maps tab: where the phone is, and how far it is located.
+      Location is already asked for above, for the Wi-Fi name, and the map
+      uses the same grant. The step counter needs its own: ACTIVITY_RECOGNITION
+      is what reads the hardware pedometer, which is the only way to know a
+      day's total rather than only the part Tepi was watching. Both are
+      optional — without them the tab says which is missing and nothing else
+      changes.
+    -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
-    <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />
-    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature
+        android:name="android.hardware.sensor.stepcounter"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.location.gps"
+        android:required="false" />
 
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!--
+      The screenshot card. Android has no "a screenshot was taken" signal for
+      other apps, so the gallery is watched for a new image in a Screenshots
+      folder; that read is what these allow. Optional: without them the card
+      stays off and nothing else changes.
+    -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
+    <!-- App list for the notification filter -->
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -39,7 +63,10 @@
         android:usesCleartextTraffic="true"
         android:theme="@style/Tepi">
 
-        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -50,24 +77,50 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="tepi" android:host="pair" />
             </intent-filter>
-            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <activity android:name=".Items" android:exported="false" />
-        <activity android:name=".TranslateActivity" android:excludeFromRecents="true" android:exported="true" android:label="@string/translate_with_tepi" android:noHistory="true" android:taskAffinity="" android:theme="@style/Tepi.Hop">
+
+        <activity
+            android:name=".TranslateActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="@string/translate_with_tepi"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Tepi.Hop">
             <intent-filter>
                 <action android:name="android.intent.action.PROCESS_TEXT" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
-        <activity android:name=".Confirm" android:excludeFromRecents="true" android:exported="false" android:noHistory="true" android:taskAffinity="" android:theme="@style/Tepi.Hop" />
+
+        <activity
+            android:name=".Confirm"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Tepi.Hop" />
+
         <activity android:name=".Apps" android:exported="false" />
         <activity android:name=".Pins" android:exported="false" />
         <activity android:name=".Section" android:exported="false" />
         <activity android:name=".Reads" android:exported="false" />
 
-        <activity android:name=".SendActivity" android:enabled="false" android:excludeFromRecents="true" android:exported="true" android:icon="@mipmap/ic_launcher" android:label="@string/send_to_laptop" android:noHistory="true" android:theme="@style/Tepi.Hop">
+        <activity
+            android:name=".SendActivity"
+            android:enabled="false"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/send_to_laptop"
+            android:noHistory="true"
+            android:theme="@style/Tepi.Hop">
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -80,9 +133,19 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".PickSendActivity" android:excludeFromRecents="true" android:exported="false" android:theme="@style/Tepi.Hop" />
+        <activity
+            android:name=".PickSendActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/Tepi.Hop" />
 
-        <activity android:name=".ShareActivity" android:excludeFromRecents="true" android:exported="true" android:label="@string/save_to_tepi" android:noHistory="true" android:taskAffinity="" android:theme="@style/Tepi.Hop">
+        <activity
+            android:name=".ShareActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="@string/save_to_tepi"
+            android:noHistory="true"
+            android:theme="@style/Tepi.Hop">
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -100,21 +163,55 @@
             </intent-filter>
         </activity>
 
-        <provider android:name=".ShelfProvider" android:authorities="${applicationId}.shelf" android:exported="false" android:grantUriPermissions="true" />
-        <activity android:name=".Open" android:excludeFromRecents="true" android:exported="false" android:noHistory="true" android:taskAffinity="" android:theme="@style/Tepi.Hop" />
+        <provider
+            android:name=".ShelfProvider"
+            android:authorities="${applicationId}.shelf"
+            android:exported="false"
+            android:grantUriPermissions="true" />
 
-        <service android:name=".Tile" android:exported="true" android:icon="@drawable/ic_mark" android:label="@string/app_name" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
-            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
-            <meta-data android:name="android.service.quicksettings.TOGGLEABLE_TILE" android:value="true" />
+        <activity
+            android:name=".Open"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Tepi.Hop" />
+
+        <service
+            android:name=".Tile"
+            android:exported="true"
+            android:icon="@drawable/ic_mark"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
         </service>
 
-        <service android:name=".Access" android:exported="true" android:label="@string/app_name" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
-            <meta-data android:name="android.accessibilityservice" android:resource="@xml/access" />
+        <service
+            android:name=".Access"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/access" />
         </service>
 
-        <service android:name=".Listener" android:exported="true" android:label="@string/app_name" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter>
+        <service
+            android:name=".Listener"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
         </service>
     </application>
 </manifest>
