@@ -78,9 +78,8 @@ class Listener : NotificationListenerService() {
 
     override fun onCreate() {
         super.onCreate(); prefs = Prefs(this)
-        try { getSystemSystemNotificationManager() } catch (_: Exception) { }
-        lyrics = Lyrics(java.io.File(cacheDir, "lyrics"))
-        notes = Notes(this); shelf = Shelf(this)
+        try { getSystemService(NotificationManager::class.java).cancelAll() } catch (_: Exception) { }
+        lyrics = Lyrics(java.io.File(cacheDir, "lyrics")); notes = Notes(this); shelf = Shelf(this)
         timers = Timers(this, prefs, ended = { timerEnded(it) }, changed = { island?.refresh() })
         reminders = Reminders(this, prefs, prayAlert = { i, at, now -> prayAlert(i, at, now) }, nudge = { nudge(it) })
         agenda = Agenda(this, prefs, changed = { island?.refresh() }, classSoon = { classSoon(it) })
@@ -98,39 +97,14 @@ class Listener : NotificationListenerService() {
 
     override fun onListenerConnected() { instance = this; connected = true; media = Media(this, ComponentName(this, Listener::class.java)) { island?.mediaChanged() }.also { it.start() }; applyEnabled() }
 
-    fun applyEnabled() {
-        if (prefs.enabled) {
-            reminders.start(); watch.start(); agenda.start(); wallet.start(); pc.start(); radios.start(); github.start(); capture.start(); volume.start(); flags.start(); steps.start(); glare.start()
-            try { activeNotifications?.forEach { live.posted(it) } } catch (_: Exception) { }
-            ensureIsland()
-        } else {
-            island?.detach(); island = null
-            reminders.stop(); watch.stop(); agenda.stop(); wallet.stop(); pc.stop(); radios.stop(); github.stop(); capture.stop(); volume.stop(); flags.stop(); steps.stop(); glare.stop(); live.clear()
-        }
-        Tile.refresh(this)
-    }
+    fun applyEnabled() { if (prefs.enabled) { reminders.start(); watch.start(); agenda.start(); wallet.start(); pc.start(); radios.start(); github.start(); capture.start(); volume.start(); flags.start(); steps.start(); glare.start(); try { activeNotifications?.forEach { live.posted(it) } } catch (_: Exception) { }; ensureIsland() } else { island?.detach(); island = null; reminders.stop(); watch.stop(); agenda.stop(); wallet.stop(); pc.stop(); radios.stop(); github.stop(); capture.stop(); volume.stop(); flags.stop(); steps.stop(); glare.stop(); live.clear() }; Tile.refresh(this) }
 
     override fun onListenerDisconnected() { connected = false; teardown(); if (prefs.enabled) android.os.Handler(mainLooper).postDelayed({ if (!connected) try { NotificationListenerService.requestRebind(ComponentName(this, Listener::class.java)) } catch (_: Exception) { } }, REBIND_DELAY_MS) }
     override fun onDestroy() { teardown(); super.onDestroy() }
 
-    private fun teardown() {
-        island?.detach(); island = null
-        reminders.stop(); watch.stop(); agenda.stop(); wallet.stop(); pc.stop(); radios.stop(); github.stop(); capture.stop(); volume.stop(); flags.stop(); steps.stop(); glare.stop(); maps.clear(); live.clear()
-        media?.stop(); media = null
-        if (instance === this) instance = null
-    }
+    private fun teardown() { island?.detach(); island = null; reminders.stop(); watch.stop(); agenda.stop(); wallet.stop(); pc.stop(); radios.stop(); github.stop(); capture.stop(); volume.stop(); flags.stop(); steps.stop(); glare.stop(); maps.clear(); live.clear(); media?.stop(); media = null; if (instance === this) instance = null }
 
-    fun ensureIsland() {
-        if (!prefs.enabled) return
-        val m = media ?: return
-        val access = Access.instance
-        if (island != null || (access == null && !Settings.canDrawOverlays(this))) return
-        val display = getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY) ?: return
-        val type = if (access != null) WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY else WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        val ctx = access ?: if (Build.VERSION.SDK_INT >= 31) createWindowContext(display, type, null) else this
-        val probe = if (access != null && Settings.canDrawOverlays(this)) { if (Build.VERSION.SDK_INT >= 31) createWindowContext(display, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null) else this } else null
-        island = Island(ctx, probe, display, type, m, prefs, lyrics).also { try { wire(it); it.attach(); it.mediaChanged(); if (watch.level >= 0) it.battery(watch.level, watch.charging) } catch (_: Exception) { island = null } }
-    }
+    fun ensureIsland() { if (!prefs.enabled) return; val m = media ?: return; val access = Access.instance; if (island != null || (access == null && !Settings.canDrawOverlays(this))) return; val display = getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY) ?: return; val type = if (access != null) WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY else WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY; val ctx = access ?: if (Build.VERSION.SDK_INT >= 31) createWindowContext(display, type, null) else this; val probe = if (access != null && Settings.canDrawOverlays(this)) { if (Build.VERSION.SDK_INT >= 31) createWindowContext(display, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null) else this } else null; island = Island(ctx, probe, display, type, m, prefs, lyrics).also { try { wire(it); it.attach(); it.mediaChanged(); if (watch.level >= 0) it.battery(watch.level, watch.charging) } catch (_: Exception) { island = null } } }
 
     private fun wire(isl: Island) {
         val al = AlertScene(isl); val ts = TimerScene(isl, timers); alerts = al; timerScene = ts
@@ -158,7 +132,6 @@ class Listener : NotificationListenerService() {
     private fun open(cls: Class<*>, mode: String) { startActivity(android.content.Intent(this, cls).putExtra(Items.MODE, mode).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
     private fun newNote() { island?.input(getString(R.string.note_hint)) { text -> if (text.isNotBlank()) { notes.add(text); alert(Alert("note", getString(R.string.note_saved), text, Glyph.Check, ms = 2500)) } } }
     private fun picked(item: ShelfItem) { if (item.isText) { shelf.copy(item); alert(Alert("shelf", getString(R.string.copied), item.text!!.take(80), Glyph.Check, ms = 2500)) } else island?.open(shelf.openIntent(item)) }
-
     private fun shelve(shot: Shot) { Thread { val ok = try { shelf.addFile(shot.uri) } catch (_: Exception) { false }; android.os.Handler(mainLooper).post { alert(Alert("shelf", getString(if (ok) R.string.shot_shelved else R.string.shot_shelve_failed), shot.name, if (ok) Glyph.Check else Glyph.Bell, ms = 3000)) } }.start() }
     private fun alert(a: Alert) { ensureIsland(); alerts?.show(a) }
 
@@ -168,7 +141,6 @@ class Listener : NotificationListenerService() {
     private fun askWalk() { section(Section.ACTIVITIES) }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) { live.removed(sbn.key); if (forwarded.remove(sbn.key)) pc.removed(sbn.key) }
-
     private fun fromLaptop(name: String, uri: android.net.Uri?) { if (uri == null) { alert(Alert("pc", getString(R.string.pc_file_failed), name, Glyph.Bell, ms = 4000)); return }; val open = Action(getString(R.string.open), primary = true, icon = Icon.Open) { val type = contentResolver.getType(uri) ?: "*/*"; island?.open(android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(uri, type).addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)) }; alert(Alert("pc", getString(R.string.pc_file_in), name, Glyph.Check, listOf(open), 8000)) }
     fun sentToLaptop(ok: Boolean, name: String) { alert(Alert("pc", getString(if (ok) R.string.pc_sent else R.string.pc_send_failed), name, if (ok) Glyph.Check else Glyph.Bell, ms = 4000)) }
 
@@ -177,9 +149,7 @@ class Listener : NotificationListenerService() {
     private fun forward(sbn: StatusBarNotification, rankingMap: RankingMap?) { val n = sbn.notification; val isl = island ?: return; if (sbn.isOngoing || !isMessage(n) || n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return; if (rankingMap != null) { val rank = Ranking(); if (rankingMap.getRanking(sbn.key, rank) && rank.importance < NotificationManager.IMPORTANCE_DEFAULT) return }; val (title, text) = chat(n); if (title.isEmpty() && text.isEmpty()) return; val sig = sbn.packageName + "|" + title + "|" + text; val nowMs = SystemClock.uptimeMillis(); recent.entries.removeAll { nowMs - it.value > 60_000 }; if (recent.containsKey(sig)) return; recent[sig] = nowMs; val locked = getSystemService(KeyguardManager::class.java).isKeyguardLocked; val reveal = prefs.notifContent && !locked; val app = appLabel(sbn.packageName); val badge = appIcon(sbn.packageName); val icon = n.getLargeIcon()?.loadDrawable(this)?.let { bitmap(it) } ?: badge; val reply = if (reveal) n.actions?.firstOrNull { a -> a.remoteInputs?.any { it.allowFreeFormInput } == true } else null; val others = if (reveal) n.actions?.filter { it !== reply && it.remoteInputs.isNullOrEmpty() && it.actionIntent != null }?.take(2).orEmpty() else emptyList(); val built = if (reveal) Message(sbn.key, title.ifEmpty { app }, text, icon, n.contentIntent, reply, others, app, badge, sbn.postTime) else Message(sbn.key, app, getString(R.string.new_message), badge, n.contentIntent, app = app, appIcon = badge, at = sbn.postTime); isl.show(built) }
 
     private fun timerEnded(k: Timers.Kind) { Bell.ring(this); val (title, body) = when (k) { Timers.Kind.Focus -> getString(R.string.t_focus_done) to getString(R.string.t_break_now, prefs.int("focus.break", 5)); Timers.Kind.Break -> getString(R.string.t_break_done) to getString(R.string.t_again); else -> getString(R.string.t_done) to "" }; val acts = if (k == Timers.Kind.Break) listOf(Action(getString(R.string.t_focus_n, 30), primary = true, icon = Icon.Timer) { timers.focus(30) }) else emptyList(); alert(Alert("timer", title, body, Glyph.Check, acts, 8000)) }
-
     private fun prayAlert(i: Int, at: Long, now: Boolean) { val name = Prayer.names[i]; val time = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(at)); val title = if (now) getString(R.string.pray_now, name) else getString(R.string.pray_soon, name, prefs.int("pray.before", 10)); alert(Alert("pray", title, "${reminders.city()?.name ?: ""} · $time", Glyph.Moon, ms = if (now) 10_000 else 7000)) }
-
     private fun nudge(n: Nudge) { val later = Action(getString(R.string.later)) { reminders.snooze(15) }; when (n) { Nudge.Drink -> alert(Alert("nudge", getString(R.string.n_drink), getString(R.string.n_drink_count, reminders.drinkCount(), reminders.drinkGoal()), Glyph.Drop, listOf(Action(getString(R.string.n_drank), primary = true, icon = Icon.Check) { reminders.drank() }, later), 12_000)); Nudge.Eyes -> alert(Alert("nudge", getString(R.string.n_eyes), getString(R.string.n_eyes_body), Glyph.Eye, listOf(later), 20_000)); Nudge.Stretch -> alert(Alert("nudge", getString(R.string.n_stretch), getString(R.string.n_stretch_body), Glyph.Stretch, listOf(later), 12_000)) } }
 
     override fun onNotificationPosted(sbn: StatusBarNotification, rankingMap: RankingMap?) {
@@ -208,14 +178,11 @@ class Listener : NotificationListenerService() {
     }
 
     private fun startWhatsAppTimerIfMatched(sbn: StatusBarNotification) { val n = sbn.notification; if (sbn.isOngoing || n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return; val (title, _) = chat(n); if (prefs.bool(WhatsAppTimer.ENABLED, false)) WhatsAppTimer.matches(prefs, title, n)?.let { target -> WhatsAppTimer.startSystemTimer(this, target, prefs) } }
-
     private fun isMessage(n: Notification): Boolean { if (n.extras.containsKey(Notification.EXTRA_MEDIA_SESSION)) return false; if (n.category == Notification.CATEGORY_MESSAGE || n.category == Notification.CATEGORY_EMAIL) return true; if (n.extras.containsKey(Notification.EXTRA_MESSAGES)) return true; return n.actions?.any { it.remoteInputs?.isNotEmpty() == true } == true }
-
     private fun chat(n: Notification): Pair<String, String> { val x = n.extras; val conv = x.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()?.trim()?.takeIf { it.isNotEmpty() }; val last = lastBundle(n); val sender = last?.let { senderOf(it) }; val group = x.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION) && conv != null; val body = last?.getCharSequence("text")?.toString()?.trim()?.takeIf { it.isNotEmpty() } ?: x.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim().orEmpty(); val title = (if (group) conv else sender ?: conv ?: x.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim()).orEmpty(); return title to (if (group && sender != null) "$sender: $body" else body) }
 
     @Suppress("DEPRECATION") private fun lastBundle(n: Notification): android.os.Bundle? = n.extras.getParcelableArray(Notification.EXTRA_MESSAGES)?.lastOrNull() as? android.os.Bundle
     @Suppress("DEPRECATION") private fun senderOf(b: android.os.Bundle): String? { val person = b.getParcelable<android.app.Person>("sender_person"); return (person?.name ?: b.getCharSequence("sender"))?.toString()?.trim()?.takeIf { it.isNotEmpty() } }
-
     private fun appLabel(pkg: String): String = try { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() } catch (_: Exception) { pkg }
     private fun appIcon(pkg: String): Bitmap? = try { bitmap(packageManager.getApplicationIcon(pkg)) } catch (_: Exception) { null }
     private fun bitmap(d: Drawable): Bitmap { if (d is BitmapDrawable && d.bitmap != null) return d.bitmap; val side = (48 * resources.displayMetrics.density).toInt(); val bmp = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888); val c = Canvas(bmp); d.setBounds(0, 0, side, side); d.draw(c); return bmp }
