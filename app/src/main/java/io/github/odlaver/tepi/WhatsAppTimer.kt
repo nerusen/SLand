@@ -51,23 +51,38 @@ object WhatsAppTimer {
     fun matches(prefs: Prefs, title: String, notification: Notification): WhatsAppTimerTarget? {
         val titleText = title.trim()
         val extras = notification.extras
-        val extrasText = buildString {
+        val nameCandidates = ArrayList<String>()
+        if (titleText.isNotEmpty()) nameCandidates.add(titleText)
+        for (key in listOf(Notification.EXTRA_CONVERSATION_TITLE, Notification.EXTRA_TITLE)) {
+            extras.getCharSequence(key)?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { nameCandidates.add(it) }
+        }
+
+        val textToInspect = buildString {
+            append(titleText)
             for (key in listOf(Notification.EXTRA_TEXT, Notification.EXTRA_BIG_TEXT, Notification.EXTRA_CONVERSATION_TITLE, Notification.EXTRA_TITLE)) {
                 extras.getCharSequence(key)?.let { append(' ').append(it) }
             }
             extras.getParcelableArray(Notification.EXTRA_MESSAGES)?.forEach { value ->
                 val bundle = value as? android.os.Bundle ?: return@forEach
                 bundle.getCharSequence("text")?.let { append(' ').append(it) }
-                bundle.getCharSequence("sender")?.let { append(' ').append(it) }
+                bundle.getCharSequence("sender")?.let { sender ->
+                    nameCandidates.add(sender.toString())
+                    append(' ').append(sender)
+                }
+                val personName = bundle.getParcelable<android.app.Person>("sender_person")?.name?.toString()?.trim()
+                personName?.takeIf { it.isNotEmpty() }?.let { nameCandidates.add(it); append(' ').append(it) }
             }
-        }
-        val textToInspect = "$titleText $extrasText"
+        }.toString()
 
-        val names = textToInspect.split(Regex("[\\n|:•]+"))
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
         for (target in load(prefs)) {
-            val nameMatch = target.name.isNotEmpty() && names.any { it.equals(target.name, ignoreCase = true) }
+            val nameMatch = target.name.isNotEmpty() && nameCandidates.any { candidate ->
+                val comparable = candidate
+                    .replace(Regex("\\s*\\(\\d+\\)\\s*$"), "")
+                    .replace(Regex("\\s*[·•|-]\\s*\\d+(\\s*(new|pesan|baru|messages?))?\\s*$", RegexOption.IGNORE_CASE), "")
+                    .trim()
+                comparable.equals(target.name, ignoreCase = true) ||
+                    Regex("(?i)(^|[^A-Za-z0-9])${Regex.escape(target.name)}([^A-Za-z0-9]|$)").containsMatchIn(comparable)
+            }
             val explicitNumber = Regex("\\d{8,15}").findAll(textToInspect).map { normalize(it.value) }.any { it == target.number }
             if (nameMatch || explicitNumber) return target
         }
@@ -86,12 +101,9 @@ object WhatsAppTimer {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         return try {
-            val resolved = intent.resolveActivity(context.packageManager)
-            if (resolved == null) false else {
-                context.startActivity(intent)
-                prefs.set(key, now)
-                true
-            }
+            context.startActivity(intent)
+            prefs.set(key, now)
+            true
         } catch (_: Exception) {
             false
         }
