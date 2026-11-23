@@ -12,6 +12,8 @@ class Prefs(context: Context) {
     fun set(key: String, v: Int) = sp.edit().putInt(key, v).apply()
     fun str(key: String, def: String) = sp.getString(key, def) ?: def
     fun set(key: String, v: String) = sp.edit().putString(key, v).apply()
+    fun long(key: String, def: Long) = sp.getLong(key, def)
+    fun set(key: String, v: Long) = sp.edit().putLong(key, v).apply()
 
     // Master switch: island and every feature
     var enabled: Boolean

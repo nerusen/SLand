@@ -422,6 +422,7 @@ class Listener : NotificationListenerService() {
     // Messages to the laptop's Pesan
     private fun forward(sbn: StatusBarNotification, rankingMap: RankingMap?) {
         val n = sbn.notification
+        val isl = island ?: return
         if (sbn.isOngoing || !isMessage(n) || n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
         if (rankingMap != null) {
             val rank = Ranking()
@@ -429,16 +430,25 @@ class Listener : NotificationListenerService() {
         }
         val (title, text) = chat(n)
         if (title.isEmpty() && text.isEmpty()) return
-        val sig = sbn.key + "|" + title + "|" + text
-        val now = SystemClock.uptimeMillis()
-        sentPc.entries.removeAll { now - it.value > 60_000 }
-        if (sentPc.containsKey(sig)) return
-        sentPc[sig] = now
+
+        // Same text again: an update, not news
+        // Same app, chat, and text: one card, whatever the key
+        val sig = sbn.packageName + "|" + title + "|" + text
+        val nowMs = SystemClock.uptimeMillis()
+        recent.entries.removeAll { nowMs - it.value > 60_000 }
+        if (recent.containsKey(sig)) return
+        recent[sig] = nowMs
+
+        val locked = getSystemService(KeyguardManager::class.java).isKeyguardLocked
+        val reveal = prefs.notifContent && !locked
         val app = appLabel(sbn.packageName)
-        if (forwarded.size > 500) forwarded.clear()
-        forwarded.add(sbn.key)
-        if (prefs.notifContent) pc.notif(sbn.key, sbn.packageName, app, title.ifEmpty { app }, text, appIcon(sbn.packageName))
-        else pc.notif(sbn.key, sbn.packageName, app, app, getString(R.string.new_message), appIcon(sbn.packageName))
+        val badge = appIcon(sbn.packageName)
+        val icon = n.getLargeIcon()?.loadDrawable(this)?.let { bitmap(it) } ?: badge
+        val reply = if (reveal) n.actions?.firstOrNull { a -> a.remoteInputs?.any { it.allowFreeFormInput } == true } else null
+        val others = if (reveal) n.actions?.filter { it !== reply && it.remoteInputs.isNullOrEmpty() && it.actionIntent != null }?.take(2).orEmpty() else emptyList()
+        val built = if (reveal) Message(sbn.key, title.ifEmpty { app }, text, icon, n.contentIntent, reply, others, app, badge, sbn.postTime)
+        else Message(sbn.key, app, getString(R.string.new_message), badge, n.contentIntent, app = app, appIcon = badge, at = sbn.postTime)
+        isl.show(built)
     }
 
     private fun timerEnded(k: Timers.Kind) {
@@ -508,6 +518,7 @@ class Listener : NotificationListenerService() {
         if (!AppFilter.allowed(prefs, sbn.packageName)) return
         live.posted(sbn)
         if (!own && code == null && pc.linked && pc.online) forward(sbn, rankingMap)
+        if (sbn.packageName == "com.whatsapp") startWhatsAppTimerIfMatched(sbn, rankingMap)
         val isl = island ?: return
         // Sideways, the notch's eye is the only thing on screen; anything from
         // another app startles it, whether or not a card would be shown. This
@@ -544,6 +555,21 @@ class Listener : NotificationListenerService() {
         val built = if (reveal) Message(sbn.key, title.ifEmpty { app }, text, icon, n.contentIntent, reply, others, app, badge, sbn.postTime)
         else Message(sbn.key, app, getString(R.string.new_message), badge, n.contentIntent, app = app, appIcon = badge, at = sbn.postTime)
         isl.show(built)
+    }
+
+    private fun startWhatsAppTimerIfMatched(sbn: StatusBarNotification, rankingMap: RankingMap?) {
+        val n = sbn.notification
+        if (sbn.isOngoing || !isMessage(n) || n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+        if (rankingMap != null) {
+            val rank = Ranking()
+            if (rankingMap.getRanking(sbn.key, rank) && rank.importance < NotificationManager.IMPORTANCE_DEFAULT) return
+        }
+        val (title, _) = chat(n)
+        if (title.isNotEmpty() && prefs.bool(WhatsAppTimer.ENABLED, false)) {
+            WhatsAppTimer.matches(prefs, title, n)?.let { target ->
+                WhatsAppTimer.startSystemTimer(this, target, prefs)
+            }
+        }
     }
 
     private fun isMessage(n: Notification): Boolean {

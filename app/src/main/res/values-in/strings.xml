@@ -16,6 +16,12 @@
     <string name="notifs_sub">Pesan masuk muncul dari island beberapa detik.</string>
     <string name="notif_content">Tampilkan isi pesan</string>
     <string name="notif_content_sub">Disembunyikan selama HP terkunci.</string>
+    <string name="wa_timer_title">Timer WhatsApp</string>
+    <string name="wa_timer_enabled">Mulai timer 10 detik</string>
+    <string name="wa_timer_sub">Memulai timer Jam Android saat kontak yang dipilih mengirim pesan WhatsApp. Target dapat memicu lagi setelah 5 menit.</string>
+    <string name="wa_timer_add">Kontak target</string>
+    <string name="wa_timer_limit">%1$d dari 5 kontak dipilih</string>
+    <string name="remove">Hapus</string>
     <string name="offset">Posisi vertikal</string>
     <string name="idle_bar">Capsule selalu tampil</string>
     <string name="idle_bar_sub">Menahan capsule lebar di sekitar kamera saat tidak ada aktivitas, termasuk di atas aplikasi dan kamera.</string>

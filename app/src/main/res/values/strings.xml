@@ -17,6 +17,12 @@
     <string name="notifs_sub">Incoming messages drop out of the island for a few seconds.</string>
     <string name="notif_content">Show message text</string>
     <string name="notif_content_sub">Hidden while the phone is locked.</string>
+    <string name="wa_timer_title">WhatsApp timer</string>
+    <string name="wa_timer_enabled">Start a 10-second timer</string>
+    <string name="wa_timer_sub">Starts the Android Clock timer when a selected contact sends a WhatsApp message. A target can trigger again after 5 minutes.</string>
+    <string name="wa_timer_add">Target contacts</string>
+    <string name="wa_timer_limit">%1$d of 5 contacts selected</string>
+    <string name="remove">Remove</string>
     <string name="offset">Vertical position</string>
     <string name="idle_bar">Always-on capsule</string>
     <string name="idle_bar_sub">Keeps a wide capsule around the camera when nothing is happening, over apps and the camera too.</string>

@@ -3,6 +3,7 @@ package io.github.odlaver.tepi
 import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
+import android.provider.ContactsContract
 import android.widget.LinearLayout
 
 // One settings category per page
@@ -305,6 +306,21 @@ class Section : Page() {
         row(m, getString(R.string.apps), getString(R.string.apps_row_sub), icon = Icon.Layers) { startActivity(Intent(this, Apps::class.java)) }
         toggle(m, getString(R.string.notifs), getString(R.string.notifs_sub), prefs.notifs, icon = Icon.Chat) { prefs.notifs = it }
         toggle(m, getString(R.string.notif_content), getString(R.string.notif_content_sub), prefs.notifContent, icon = Icon.Eye) { prefs.notifContent = it }
+        label(getString(R.string.wa_timer_title))
+        val wa = group()
+        toggle(wa, getString(R.string.wa_timer_enabled), getString(R.string.wa_timer_sub), prefs.bool(WhatsAppTimer.ENABLED, false), icon = Icon.Timer) {
+            prefs.set(WhatsAppTimer.ENABLED, it)
+            rebuild()
+        }
+        val targets = WhatsAppTimer.load(prefs)
+        targets.forEachIndexed { index, target ->
+            row(wa, target.name, target.number, button(getString(R.string.remove), false, Icon.Trash) {
+                WhatsAppTimer.save(prefs, targets.filterIndexed { i, _ -> i != index })
+                rebuild()
+            }, Icon.User)
+        }
+        row(wa, getString(R.string.wa_timer_add), getString(R.string.wa_timer_limit, targets.size),
+            button(getString(R.string.choose), targets.size < 5, Icon.User) { pickWhatsAppContact() }, Icon.Plus)
         label(getString(R.string.system))
         val s = group()
         for ((key, title, detail, icon) in listOf(
@@ -399,6 +415,33 @@ class Section : Page() {
     private fun restartCapture() {
         changed()
         Listener.instance?.let { it.capture.stop(); it.capture.start() }
+    }
+
+    private fun pickWhatsAppContact() {
+        if (WhatsAppTimer.load(prefs).size >= 5) return
+        startActivityForResult(Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI), REQ_WA_CONTACT)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQ_WA_CONTACT || resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        val projection = arrayOf(
+            ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+            ContactsContract.CommonDataKinds.Phone.NUMBER,
+        )
+        contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+            if (!cursor.moveToFirst()) return
+            val name = cursor.getString(0)?.trim().orEmpty()
+            val number = WhatsAppTimer.normalize(cursor.getString(1).orEmpty())
+            if (name.isEmpty() || number.isEmpty()) return
+            val targets = WhatsAppTimer.load(prefs)
+            if (targets.none { it.number == number } && targets.size < 5) {
+                WhatsAppTimer.save(prefs, targets + WhatsAppTimerTarget(name, number))
+                rebuild()
+            }
+        }
     }
 
     private fun productivity() {
@@ -707,6 +750,7 @@ class Section : Page() {
         private const val REQ_RADIOS = 7
         private const val REQ_SHOT = 8
         private const val REQ_WALK = 9
+        private const val REQ_WA_CONTACT = 7101
         const val MODE = "mode"
         const val LINK = "link"
         const val ISLAND = "island"
