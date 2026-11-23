@@ -80,22 +80,19 @@ class Listener : NotificationListenerService() {
     override fun onCreate() {
         super.onCreate()
         prefs = Prefs(this)
-        // Leftovers from the old HyperOS island mode
         try { getSystemService(NotificationManager::class.java).cancelAll() } catch (_: Exception) { }
         lyrics = Lyrics(java.io.File(cacheDir, "lyrics"))
         notes = Notes(this)
         shelf = Shelf(this)
         timers = Timers(this, prefs, ended = { timerEnded(it) }, changed = { island?.refresh() })
         reminders = Reminders(this, prefs, prayAlert = { i, at, now -> prayAlert(i, at, now) }, nudge = { nudge(it) })
-        agenda = Agenda(this, prefs, changed = { island?.refresh() }, classSoon = { classSoon(it) })
+        agenda = Agenda(this, prefs, changed = { island?.refresh() }, classSoon = { classSoon(it) }, examSoon = { examSoon(it) })
         wallet = Wallet(agenda.vault) { island?.refresh() }
         assistant = Assistant(this)
         pc = Pc(this, agenda.vault, prefs) { island?.refresh() }
         pc.onFile = { name, uri -> fromLaptop(name, uri) }
         radios = Radios(this) { island?.refresh() }
         github = Github(this, agenda.vault) { island?.refresh() }
-        // A screenshot, the volume buttons, and the switches in the shade:
-        // each one only ever speaks when the user has just acted on the phone
         capture = Capture(this, prefs) { shot ->
             ensureIsland()
             shots?.show(shot)
@@ -108,12 +105,9 @@ class Listener : NotificationListenerService() {
             ensureIsland()
             flagScene?.show(flag, on)
         }
-        // Walking: the step counter all day, and GPS only while the map is up
         steps = Steps(this, prefs) { island?.refresh() }
         shortcuts = Shortcuts(this, prefs)
         maps = Maps(this, cacheDir)
-        // The screen turned most of the way up, which is almost always the
-        // slider left where daylight put it
         glare = Glare(this, prefs) { pct -> tooBright(pct) }
         live = Live(this, prefs, { n, pkg -> n.getLargeIcon()?.loadDrawable(this)?.let { bitmap(it) } ?: appIcon(pkg) }) { island?.refresh() }
         watch = Watch(this, prefs, brief = { k, t -> briefs?.show(k, t) }, lowBattery = { lowBattery(it) }, battery = { l, c ->
@@ -129,14 +123,9 @@ class Listener : NotificationListenerService() {
         instance = this
         connected = true
         media = Media(this, ComponentName(this, Listener::class.java)) { island?.mediaChanged() }.also { it.start() }
-        // Notification listener access can disconnect while the settings app is
-        // closed or while Android restarts the process. Reconnecting must
-        // restart the enabled features and rebuild the overlay; otherwise the
-        // island stays invisible until MainActivity happens to call ensureIsland().
         applyEnabled()
     }
 
-    // Start or pause everything after the master switch
     fun applyEnabled() {
         if (prefs.enabled) {
             reminders.start()
@@ -179,9 +168,7 @@ class Listener : NotificationListenerService() {
         if (prefs.enabled) {
             android.os.Handler(mainLooper).postDelayed({
                 if (!connected) {
-                    try {
-                        NotificationListenerService.requestRebind(ComponentName(this, Listener::class.java))
-                    } catch (_: Exception) { }
+                    try { NotificationListenerService.requestRebind(ComponentName(this, Listener::class.java)) } catch (_: Exception) { }
                 }
             }, REBIND_DELAY_MS)
         }
@@ -214,14 +201,12 @@ class Listener : NotificationListenerService() {
         if (instance === this) instance = null
     }
 
-    // Overlay access may arrive later
     fun ensureIsland() {
         if (!prefs.enabled) return
         val m = media ?: return
         val access = Access.instance
         if (island != null || (access == null && !Settings.canDrawOverlays(this))) return
         val display = getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY) ?: return
-        // Accessibility window sits above the status bar
         val type = if (access != null) WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY else WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         val ctx = access ?: if (Build.VERSION.SDK_INT >= 31) createWindowContext(display, type, null) else this
         val probe = if (access != null && Settings.canDrawOverlays(this)) {
@@ -232,8 +217,6 @@ class Listener : NotificationListenerService() {
                 wire(it)
                 it.attach()
                 it.mediaChanged()
-                // Watch registered before this island existed, so hand it the
-                // level it already has instead of waiting for the next change
                 if (watch.level >= 0) it.battery(watch.level, watch.charging)
             } catch (_: Exception) {
                 island = null
@@ -241,7 +224,6 @@ class Listener : NotificationListenerService() {
         }
     }
 
-    // Features into a fresh island
     private fun wire(isl: Island) {
         val al = AlertScene(isl)
         val ts = TimerScene(isl, timers)
@@ -255,11 +237,7 @@ class Listener : NotificationListenerService() {
         privacyScene = pv
         isl.register(br)
         isl.register(pv)
-        // System notices: the screenshot card, the volume bar, and the one
-        // line a mode switch gets
-        shots = io.github.odlaver.tepi.scene.ShotScene(isl, { shot ->
-            isl.open(Capture.share(shot))
-        }) { shot -> shelve(shot) }.also { isl.register(it) }
+        shots = io.github.odlaver.tepi.scene.ShotScene(isl, { shot -> isl.open(Capture.share(shot)) }) { shot -> shelve(shot) }.also { isl.register(it) }
         volumeScene = io.github.odlaver.tepi.scene.VolumeScene(isl, { volume.steps }) { volume.set(it) }.also { isl.register(it) }
         flagScene = io.github.odlaver.tepi.scene.FlagScene(isl).also { isl.register(it) }
         isl.register(AgentScene(isl, pc))
@@ -273,40 +251,24 @@ class Listener : NotificationListenerService() {
         isl.home.rows.add(0, TimerRow(isl, timers, ts))
         isl.home.rows.add(1, ClassRow(isl, agenda))
         isl.home.rows.add(2, PrayerRow(isl, reminders))
-        // Fixed tabs for every main feature
         val agendaTab = io.github.odlaver.tepi.scene.AgendaTab(isl, agenda) { section(Section.CONNECT) }
         isl.register(agendaTab)
         isl.register(io.github.odlaver.tepi.scene.PrayerTab(isl, reminders) { section(Section.REMINDERS) })
         isl.register(io.github.odlaver.tepi.scene.NotesTab(isl, notes, { newNote() }) { open(Items::class.java, Items.NOTES) })
         isl.register(io.github.odlaver.tepi.scene.ShelfTab(isl, shelf, { picked(it) }) { open(Items::class.java, Items.SHELF) })
         isl.register(io.github.odlaver.tepi.scene.AgentsTab(isl, pc))
-        // The wallet mirror: balances, the Kanban board, and the assistant that
-        // answers questions about both
         isl.register(io.github.odlaver.tepi.scene.FinanceScene(isl, wallet))
         isl.register(io.github.odlaver.tepi.scene.KanbanScene(isl, wallet))
         isl.register(io.github.odlaver.tepi.scene.AssistantScene(isl, wallet, assistant))
-        // Recent captures as a grid, beside the card that announces them
-        isl.register(io.github.odlaver.tepi.scene.ShotsTab(isl, capture) {
-            isl.open(android.content.Intent(android.content.Intent.ACTION_VIEW, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI))
-        })
-        // Where the phone is, and how far it has walked today
-        val mapsTab = io.github.odlaver.tepi.scene.MapsTab(isl, maps, steps, prefs,
-            settings = { section(Section.ACTIVITIES) }) { askWalk() }
+        isl.register(io.github.odlaver.tepi.scene.ShotsTab(isl, capture) { isl.open(android.content.Intent(android.content.Intent.ACTION_VIEW, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI)) })
+        val mapsTab = io.github.odlaver.tepi.scene.MapsTab(isl, maps, steps, prefs, settings = { section(Section.ACTIVITIES) }) { askWalk() }
         isl.register(mapsTab)
-        // The map holds GPS fixes open while it is the page on screen, so it
-        // is told which page is open rather than left to notice
         isl.closers.add { id -> if (id != mapsTab.id) mapsTab.away() }
-        // Pinned apps, as a grid of icons
-        isl.register(io.github.odlaver.tepi.scene.AppsTab(isl, shortcuts) {
-            startActivity(android.content.Intent(this, Pins::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-        })
-        // The capsule's Wi-Fi and Bluetooth badges read the same watcher the
-        // Home tiles do
+        isl.register(io.github.odlaver.tepi.scene.AppsTab(isl, shortcuts) { startActivity(android.content.Intent(this, Pins::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) })
         isl.wireBadges(radios)
         isl.home.rows.add(TaskRow(isl, agenda, agendaTab))
         isl.home.rows.add(NoteRow(isl, notes) { open(Items::class.java, Items.NOTES) })
         isl.home.rows.add(ShelfRow(isl, shelf) { picked(it) })
-        // Last on Home, where the old button strip was
         isl.home.rows.add(io.github.odlaver.tepi.scene.RadioTiles(isl, radios))
         isl.register(io.github.odlaver.tepi.scene.GithubTab(isl, github) { section(Section.CONNECT) })
         isl.homeExtras.add { if (Access.paused(this)) Action(getString(R.string.perm_access), primary = true, icon = Icon.Hand) { Access.openSettings(this) } else null }
@@ -336,16 +298,11 @@ class Listener : NotificationListenerService() {
         } else island?.open(shelf.openIntent(item))
     }
 
-    // Save to shelf, from the screenshot card. The copy is a file read and a
-    // file write, so it happens off the main thread; the island is told how it
-    // went when it is done, which is also the only feedback the user gets that
-    // the picture is now Tepi's own rather than the gallery's.
     private fun shelve(shot: Shot) {
         Thread {
             val ok = try { shelf.addFile(shot.uri) } catch (_: Exception) { false }
             android.os.Handler(mainLooper).post {
-                alert(Alert("shelf", getString(if (ok) R.string.shot_shelved else R.string.shot_shelve_failed),
-                    shot.name, if (ok) Glyph.Check else Glyph.Bell, ms = 3000))
+                alert(Alert("shelf", getString(if (ok) R.string.shot_shelved else R.string.shot_shelve_failed), shot.name, if (ok) Glyph.Check else Glyph.Bell, ms = 3000))
             }
         }.start()
     }
@@ -358,9 +315,7 @@ class Listener : NotificationListenerService() {
     private fun classSoon(s: ClassSlot) {
         val time = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(s.start))
         val where = listOf(time, s.room.ifEmpty { if (s.online) "Online" else "" }).filter { it.isNotEmpty() }.joinToString(" · ")
-        val acts = s.url?.let { u -> listOf(Action(getString(R.string.join), primary = true, icon = Icon.Open) {
-            island?.open(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(u)))
-        }) } ?: emptyList()
+        val acts = s.url?.let { u -> listOf(Action(getString(R.string.join), primary = true, icon = Icon.Open) { island?.open(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(u))) }) } ?: emptyList()
         alert(Alert("class", getString(if (s.exam) R.string.exam_soon else R.string.class_soon, s.title), where, Glyph.Book, acts, 10_000))
     }
 
@@ -368,29 +323,18 @@ class Listener : NotificationListenerService() {
         alert(Alert("battery", getString(R.string.low_battery, level), getString(R.string.low_battery_body), Glyph.Bolt, ms = 6000))
     }
 
-    // The screen is most of the way up. Said as a card rather than a line,
-    // because there is something to do about it and the card can carry the
-    // button: the display settings page, where the slider is.
     private fun tooBright(pct: Int) {
-        val fix = Action(getString(R.string.glare_fix), primary = true, icon = Icon.Eye) {
-            island?.open(android.content.Intent(android.provider.Settings.ACTION_DISPLAY_SETTINGS))
-        }
+        val fix = Action(getString(R.string.glare_fix), primary = true, icon = Icon.Eye) { island?.open(android.content.Intent(android.provider.Settings.ACTION_DISPLAY_SETTINGS)) }
         alert(Alert("glare", getString(R.string.glare_title), getString(R.string.glare_body, pct), Glyph.Eye, listOf(fix), 8000))
     }
 
-    // The step counter needs a permission, and the only place to ask for one
-    // is an activity. The settings page is where the figure is explained, so
-    // that is where the request is made from too.
-    private fun askWalk() {
-        section(Section.ACTIVITIES)
-    }
+    private fun askWalk() { section(Section.ACTIVITIES) }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         live.removed(sbn.key)
         if (forwarded.remove(sbn.key)) pc.removed(sbn.key)
     }
 
-    // Laptop sent a file; it sits in Download/Tepi
     private fun fromLaptop(name: String, uri: android.net.Uri?) {
         if (uri == null) { alert(Alert("pc", getString(R.string.pc_file_failed), name, Glyph.Bell, ms = 4000)); return }
         val open = Action(getString(R.string.open), primary = true, icon = Icon.Open) {
@@ -400,16 +344,13 @@ class Listener : NotificationListenerService() {
         alert(Alert("pc", getString(R.string.pc_file_in), name, Glyph.Check, listOf(open), 8000))
     }
 
-    // Send to laptop finished
     fun sentToLaptop(ok: Boolean, name: String) {
         alert(Alert("pc", getString(if (ok) R.string.pc_sent else R.string.pc_send_failed), name, if (ok) Glyph.Check else Glyph.Bell, ms = 4000))
     }
 
-    // Codes from any app; never the notification itself
     private fun otpFrom(sbn: StatusBarNotification): String? {
         val x = sbn.notification.extras
-        val parts = listOf(x.getCharSequence(Notification.EXTRA_TITLE), x.getCharSequence(Notification.EXTRA_TEXT), x.getCharSequence(Notification.EXTRA_BIG_TEXT),
-            lastBundle(sbn.notification)?.getCharSequence("text"), sbn.notification.tickerText).mapNotNull { it?.toString() }.distinct()
+        val parts = listOf(x.getCharSequence(Notification.EXTRA_TITLE), x.getCharSequence(Notification.EXTRA_TEXT), x.getCharSequence(Notification.EXTRA_BIG_TEXT), lastBundle(sbn.notification)?.getCharSequence("text"), sbn.notification.tickerText).mapNotNull { it?.toString() }.distinct()
         val code = Otp.find(parts.joinToString("\n")) ?: return null
         val now = SystemClock.uptimeMillis()
         codes.entries.removeAll { now - it.value > 120_000 }
@@ -419,7 +360,6 @@ class Listener : NotificationListenerService() {
         return code
     }
 
-    // Messages to the laptop's Pesan
     private fun forward(sbn: StatusBarNotification, rankingMap: RankingMap?) {
         val n = sbn.notification
         val isl = island ?: return
@@ -430,15 +370,11 @@ class Listener : NotificationListenerService() {
         }
         val (title, text) = chat(n)
         if (title.isEmpty() && text.isEmpty()) return
-
-        // Same text again: an update, not news
-        // Same app, chat, and text: one card, whatever the key
         val sig = sbn.packageName + "|" + title + "|" + text
         val nowMs = SystemClock.uptimeMillis()
         recent.entries.removeAll { nowMs - it.value > 60_000 }
         if (recent.containsKey(sig)) return
         recent[sig] = nowMs
-
         val locked = getSystemService(KeyguardManager::class.java).isKeyguardLocked
         val reveal = prefs.notifContent && !locked
         val app = appLabel(sbn.packageName)
@@ -473,30 +409,25 @@ class Listener : NotificationListenerService() {
     private fun nudge(n: Nudge) {
         val later = Action(getString(R.string.later)) { reminders.snooze(15) }
         when (n) {
-            Nudge.Drink -> alert(Alert("nudge", getString(R.string.n_drink), getString(R.string.n_drink_count, reminders.drinkCount(), reminders.drinkGoal()), Glyph.Drop,
-                listOf(Action(getString(R.string.n_drank), primary = true, icon = Icon.Check) { reminders.drank() }, later), 12_000))
+            Nudge.Drink -> alert(Alert("nudge", getString(R.string.n_drink), getString(R.string.n_drink_count, reminders.drinkCount(), reminders.drinkGoal()), Glyph.Drop, listOf(Action(getString(R.string.n_drank), primary = true, icon = Icon.Check) { reminders.drank() }, later), 12_000))
             Nudge.Eyes -> alert(Alert("nudge", getString(R.string.n_eyes), getString(R.string.n_eyes_body), Glyph.Eye, listOf(later), 20_000))
             Nudge.Stretch -> alert(Alert("nudge", getString(R.string.n_stretch), getString(R.string.n_stretch_body), Glyph.Stretch, listOf(later), 12_000))
         }
     }
 
-    // Accessibility came or went
     fun rehost() {
         island?.detach()
         island = null
         ensureIsland()
     }
 
-    fun prefsChanged() {
-        island?.prefsChanged()
-    }
+    fun prefsChanged() { island?.prefsChanged() }
 
     fun test() {
         ensureIsland()
         island?.show(Message("tepi.test", getString(R.string.test_title), getString(R.string.test_text), appIcon(packageName), null))
     }
 
-    // From tile, shortcuts, notifications
     fun command(what: String): Boolean {
         ensureIsland()
         val isl = island ?: return false
@@ -514,17 +445,13 @@ class Listener : NotificationListenerService() {
         if (sbn.packageName != packageName) AppFilter.saw(prefs, sbn.packageName)
         val own = sbn.packageName == packageName
         val code = if (!own && pc.linked && pc.sendOtp) otpFrom(sbn) else null
-        // User turned this app off
         if (!AppFilter.allowed(prefs, sbn.packageName)) return
         live.posted(sbn)
         if (!own && code == null && pc.linked && pc.online) forward(sbn, rankingMap)
-        if (sbn.packageName == "com.whatsapp") startWhatsAppTimerIfMatched(sbn, rankingMap)
+        if (sbn.packageName == "com.whatsapp" || sbn.packageName == "com.whatsapp.w4b") {
+            startWhatsAppTimerIfMatched(sbn)
+        }
         val isl = island ?: return
-        // Sideways, the notch's eye is the only thing on screen; anything from
-        // another app startles it, whether or not a card would be shown. This
-        // sits above the notifs switch on purpose: the eye is a face reacting,
-        // not the content of the notification, and it says nothing about who
-        // sent what.
         if (!own) isl.startled()
         if (!prefs.notifs) return
         val n = sbn.notification
@@ -536,15 +463,11 @@ class Listener : NotificationListenerService() {
         }
         val (title, text) = chat(n)
         if (title.isEmpty() && text.isEmpty()) return
-
-        // Same text again: an update, not news
-        // Same app, chat, and text: one card, whatever the key
         val sig = sbn.packageName + "|" + title + "|" + text
         val nowMs = SystemClock.uptimeMillis()
         recent.entries.removeAll { nowMs - it.value > 60_000 }
         if (recent.containsKey(sig)) return
         recent[sig] = nowMs
-
         val locked = getSystemService(KeyguardManager::class.java).isKeyguardLocked
         val reveal = prefs.notifContent && !locked
         val app = appLabel(sbn.packageName)
@@ -557,15 +480,11 @@ class Listener : NotificationListenerService() {
         isl.show(built)
     }
 
-    private fun startWhatsAppTimerIfMatched(sbn: StatusBarNotification, rankingMap: RankingMap?) {
+    private fun startWhatsAppTimerIfMatched(sbn: StatusBarNotification) {
         val n = sbn.notification
-        if (sbn.isOngoing || !isMessage(n) || n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
-        if (rankingMap != null) {
-            val rank = Ranking()
-            if (rankingMap.getRanking(sbn.key, rank) && rank.importance < NotificationManager.IMPORTANCE_DEFAULT) return
-        }
+        if (sbn.isOngoing || n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
         val (title, _) = chat(n)
-        if (title.isNotEmpty() && prefs.bool(WhatsAppTimer.ENABLED, false)) {
+        if (prefs.bool(WhatsAppTimer.ENABLED, false)) {
             WhatsAppTimer.matches(prefs, title, n)?.let { target ->
                 WhatsAppTimer.startSystemTimer(this, target, prefs)
             }
@@ -579,8 +498,6 @@ class Listener : NotificationListenerService() {
         return n.actions?.any { it.remoteInputs?.isNotEmpty() == true } == true
     }
 
-    // MessagingStyle: newest message wins
-    // Chat apps put the account in EXTRA_TITLE; the sender is in the message
     private fun chat(n: Notification): Pair<String, String> {
         val x = n.extras
         val conv = x.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()?.trim()?.takeIf { it.isNotEmpty() }
@@ -597,7 +514,6 @@ class Listener : NotificationListenerService() {
     private fun lastBundle(n: Notification): android.os.Bundle? =
         n.extras.getParcelableArray(Notification.EXTRA_MESSAGES)?.lastOrNull() as? android.os.Bundle
 
-    // Person name first, legacy sender string second
     @Suppress("DEPRECATION")
     private fun senderOf(b: android.os.Bundle): String? {
         val person = b.getParcelable<android.app.Person>("sender_person")
@@ -627,7 +543,6 @@ class Listener : NotificationListenerService() {
         var instance: Listener? = null
             private set
 
-        // Translation result into the island
         fun translated(src: String, out: String, pair: String): Boolean {
             val l = instance ?: return false
             l.ensureIsland()
@@ -636,13 +551,13 @@ class Listener : NotificationListenerService() {
             return true
         }
 
-        // Shelf saved: tell through the island
         fun shelved(msg: String): Boolean {
             val l = instance ?: return false
             if (l.island == null) return false
             l.alert(Alert("shelf", msg, "", Glyph.Check, ms = 2500))
             return true
         }
+
         var connected = false
             private set
 
