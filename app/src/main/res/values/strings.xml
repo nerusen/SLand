@@ -18,10 +18,20 @@
     <string name="notif_content">Show message text</string>
     <string name="notif_content_sub">Hidden while the phone is locked.</string>
     <string name="wa_timer_title">WhatsApp timer</string>
-    <string name="wa_timer_enabled">Start a 10-second timer</string>
-    <string name="wa_timer_sub">Starts the Android Clock timer when a selected contact sends a WhatsApp message. A target can trigger again after 5 minutes.</string>
+    <string name="wa_timer_enabled">Play a custom alert</string>
+    <string name="wa_timer_sub">Shows a silent SLand notification and plays one alert when a selected contact sends a WhatsApp message. Each contact has a 5-minute cooldown.</string>
     <string name="wa_timer_add">Target contacts</string>
     <string name="wa_timer_limit">%1$d of 5 contacts selected</string>
+    <string name="wa_timer_sound">Alert sound</string>
+    <string name="wa_timer_sound_default">SLand OGG sound</string>
+    <string name="wa_timer_sound_custom">Custom sound selected</string>
+    <string name="wa_timer_sound_unsupported">Choose an MP3, OGG, BNK, WAV, or MOV file.</string>
+    <string name="wa_timer_permission">Allow SLand notifications to use this feature.</string>
+    <string name="wa_timer_need_contact">Choose at least one target contact first.</string>
+    <string name="wa_timer_channel">WhatsApp contact alerts</string>
+    <string name="wa_timer_notification_title">WhatsApp message from %1$s</string>
+    <string name="wa_timer_notification_body">Your selected contact sent a message.</string>
+    <string name="reset">Reset</string>
     <string name="remove">Remove</string>
     <string name="offset">Vertical position</string>
     <string name="idle_bar">Always-on capsule</string>
@@ -131,7 +141,7 @@
     <string name="copy">Copy</string>
     <string name="share">Share</string>
     <string name="reads_intro">Tepi has no account and no server. Data stays on the phone except where listed.</string>
-    <string name="reads_listener">Reads what is playing and incoming messages to show them on the island. Nothing is stored or sent.</string>
+    <string name="reads_listener">Reads media and incoming notifications. If enabled, WhatsApp target names/numbers and cooldowns are stored on this phone; the chosen alert audio is also kept local. Notification text and contacts are not sent to SLand servers.</string>
     <string name="reads_access">Opens one window above the status bar so the island can be tapped. Hears only when a listed banking app opens, then switches itself off. Reads no screen content.</string>
     <string name="reads_overlay">Draws the island over other apps.</string>
     <string name="reads_lyrics">Sends the song title and artist to LRCLIB, then NetEase. Lyrics are cached on the phone.</string>
@@ -437,6 +447,8 @@
 
     <!-- Landscape notch, and the eye in it -->
     <string name="notch">Sideways</string>
+    <string name="notch_clock">Show digital time</string>
+    <string name="notch_clock_sub">Show the time for 20 seconds every two minutes.</string>
     <string name="notch_bar">Notch in landscape</string>
     <string name="notch_bar_sub">Turned sideways the island has nowhere to sit, so it becomes a small block hanging from the middle of the top edge with a pair of eyes in it. They blink, widen when another app sends you something, and narrow to red crescents when the battery is nearly gone. Open the island out here and the block grows into the panel; close it and the eyes come back.</string>
     <string name="notch_tap">Tap opens the menu</string>

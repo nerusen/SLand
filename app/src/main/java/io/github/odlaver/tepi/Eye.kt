@@ -70,6 +70,8 @@ class Eye(private val ui: Ui) {
     // switch, so the swaying starts and stops with the song instead of
     // snapping into step with it.
     private val groove = Spring(0f, 0.004f, 200f, 26f)
+    private val shock = Spring(0f, 0.004f, 300f, 13f)
+    private val curious = Spring(0f, 0.004f, 300f, 28f)
 
     private val solid = Paint(Paint.ANTI_ALIAS_FLAG)
     // The happy crescent is filled and then stroked with a round join, which
@@ -112,6 +114,8 @@ class Eye(private val ui: Ui) {
     // The event in charge, and when it hands back
     private var event = Mood.Calm
     private var eventUntil = 0L
+    private var startleAt = 0L
+    private var curiousAt = 0L
 
     // Blink timing: when the next one is due, and when the lid opens again
     private var blinkAt = SystemClock.uptimeMillis() + BLINK_MS
@@ -134,8 +138,13 @@ class Eye(private val ui: Ui) {
     // messages in a row are one startle that lasts a little longer, not three
     // widenings fighting each other.
     fun startled() {
+        startleAt = SystemClock.uptimeMillis()
+        curiousAt = startleAt + STARTLE_GAZE_DELAY
+        shock.snap(1f)
+        shock.target = 0f
+        curious.target = 0f
         event = Mood.Startled
-        eventUntil = SystemClock.uptimeMillis() + STARTLE_MS
+        eventUntil = startleAt + STARTLE_MS
         // Eyes do not blink in the middle of a fright
         lid.target = 1f
         blinkAt = eventUntil + BLINK_MS / 2
@@ -207,9 +216,10 @@ class Eye(private val ui: Ui) {
         // is also swaying to the music reads as neither: the fright is two
         // and a half seconds long and the sway can wait for it.
         groove.target = if (grooving && m == Mood.Calm) 1f else 0f
+        curious.target = if (m == Mood.Startled && now >= curiousAt) 1f else 0f
 
         var moving = false
-        for (s in arrayOf(lid, size, joy, glare, red, green, groove)) moving = s.step(dt) or moving
+        for (s in arrayOf(lid, size, joy, glare, red, green, groove, shock, curious)) moving = s.step(dt) or moving
         // The critical level pulses, so it keeps asking for frames
         if (low == CRITICAL) {
             phase = (phase + dt * THROB_RATE) % TWO_PI
@@ -230,6 +240,7 @@ class Eye(private val ui: Ui) {
             pulsePhase = (pulsePhase + dt * PULSE_RATE) % TWO_PI
             moving = true
         }
+        if (shock.value > 0.01f || (m == Mood.Startled && now < curiousAt)) moving = true
         // A deadline still to come is motion as far as the caller is concerned
         if (eventUntil > now) moving = true
         return moving
@@ -282,9 +293,20 @@ class Eye(private val ui: Ui) {
             // than a tilt that follows it
             oy = -h * SWAY_Y * k * sin(2.0 * swayPhase).toFloat()
         }
+        val elapsed = (SystemClock.uptimeMillis() - startleAt).coerceAtLeast(0L) / 1000f
+        val jolt = abs(shock.value).coerceIn(0f, 1f)
+        ox += h * 0.10f * jolt * sin(elapsed * 46f)
+        oy += h * 0.055f * jolt * sin(elapsed * 37f + 0.8f)
         glow(c, cx + ox, cy + oy, gap, full, a, f)
         one(c, cx + ox - gap / 2, cy + oy, full, a, f)
         one(c, cx + ox + gap / 2, cy + oy, full, a, f)
+        val look = curious.value.coerceIn(0f, 1f)
+        if (look > 0.01f && m == Mood.Startled) {
+            val radius = max(ui.dp(0.7f), full * 0.085f)
+            solid.color = ui.alpha(ui.back, a * look)
+            c.drawCircle(cx + ox - gap / 2 + full * 0.11f, cy + oy, radius, solid)
+            c.drawCircle(cx + ox + gap / 2 + full * 0.11f, cy + oy, radius, solid)
+        }
     }
 
     // The soft green halo under a charging pair.
@@ -553,6 +575,7 @@ class Eye(private val ui: Ui) {
         private const val SWAY_RATE = 3.1f
         private const val PULSE_RATE = 4.3f
         private const val PULSE = 0.03f
+        private const val STARTLE_GAZE_DELAY = 280L
 
         // The most the eye ever grows past its resting height, which is the
         // startle, and the tallest the drawn shape gets against that grown

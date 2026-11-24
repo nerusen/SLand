@@ -74,6 +74,8 @@ class Island(
     private var listening = false
     private val wm = context.getSystemService(WindowManager::class.java)
     private val main = Handler(Looper.getMainLooper())
+    private var rotationPending = false
+    private val rotationRefresh = Runnable { rotationPending = false; measureScreen(); refresh() }
     private val touchable get() = type == WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
 
     // Scenes
@@ -121,6 +123,7 @@ class Island(
     // Geometry, screen px
     private var screenW = 0f
     private var screenH = 0f
+    private var measuredLandscape: Boolean? = null
     private val hole = RectF()
     private val pill = RectF()
     private var statusBottom = 0f
@@ -237,6 +240,7 @@ class Island(
 
     fun detach() {
         if (!attached) return
+        main.removeCallbacks(rotationRefresh)
         main.removeCallbacks(greetingTick)
         main.removeCallbacks(hideGreeting)
         greetingVisible = false
@@ -459,9 +463,13 @@ class Island(
     }
 
     override fun onConfigurationChanged(newConfig: Configuration?) {
+        val wasLandscape = measuredLandscape ?: landscape
         super.onConfigurationChanged(newConfig)
-        measureScreen()
-        refresh()
+        main.removeCallbacks(rotationRefresh)
+        if (wasLandscape != landscape) {
+            rotationPending = true
+            main.postDelayed(rotationRefresh, ROTATION_DELAY_MS)
+        } else rotationRefresh.run()
     }
 
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
@@ -533,6 +541,7 @@ class Island(
             statusBottom = nh
             wingBase = max(nh * 1.3f, ui.dp(36f))
         }
+        measuredLandscape = landscape
     }
 
     private val landscape get() = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -599,6 +608,7 @@ class Island(
         // exists at all: a song that started while the phone was upright has
         // to be in effect the moment it is turned sideways.
         n.music(prefs.eyeSway && music.playing)
+        n.clock(prefs.notchClock)
         // The island's hidden landscape silhouette is the notch's block
         // exactly, so a panel that has just closed leaves the right shape
         // sitting on the edge and the notch takes it over instead of growing a
@@ -684,7 +694,7 @@ class Island(
 
     // Recompute target, start motion
     override fun refresh() {
-        if (!attached) return
+        if (!attached || rotationPending) return
         choose()
         // After choose, never before: the notch stands down for the island's
         // own shapes, so it has to be told what this refresh decided rather
@@ -772,7 +782,7 @@ class Island(
             val lyricW = if (primary?.id == "music") primary?.rowWidth() ?: 0f else 0f
             if (lyricW > 0f) {
                 val width = min(lyricW, span)
-                val left = (target.centerX() - width / 2f).coerceIn(ui.edge.toFloat(), screenW - ui.edge - width)
+                val left = target.centerX() - width / 2f
                 val top = target.bottom + ui.s8
                 lyricBubble.set(left, top, left + width, top + d)
             }
@@ -1469,6 +1479,7 @@ class Island(
         private const val CLOSE_MS = 9000L
         private const val GREETING_INTERVAL_MS = 20 * 60 * 1000L
         private const val GREETING_SHOW_MS = 5000L
+        private const val ROTATION_DELAY_MS = 140L
         // Tab bar: how tall, and how long it stays up after the last nudge
         private const val NAV_H = 36f
         private const val NAV_MS = 4500L

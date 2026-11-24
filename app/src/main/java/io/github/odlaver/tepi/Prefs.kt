@@ -106,6 +106,10 @@ class Prefs(context: Context) {
         get() = bool("notch.opens", false)
         set(v) = set("notch.opens", v)
 
+    var notchClock: Boolean
+        get() = bool("notch.clock", true)
+        set(v) = set("notch.clock", v)
+
     // Size of the notch itself, as a percentage of the drawn default. Both the
     // depth and the length scale together, so the silhouette keeps its
     // proportions at every setting.

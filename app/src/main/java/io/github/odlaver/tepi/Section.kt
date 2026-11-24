@@ -1,9 +1,14 @@
 package io.github.odlaver.tepi
 
 import android.app.AlertDialog
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.ContactsContract
+import android.provider.OpenableColumns
+import android.provider.Settings
 import android.widget.LinearLayout
 
 // One settings category per page
@@ -11,6 +16,7 @@ class Section : Page() {
     private val agenda get() = Listener.instance?.agenda
     private var kuliaEmail = ""
     private var kuliaSent = false
+    private var waEnableAfterPermission = false
 
     override fun build() {
         when (intent.getStringExtra(MODE)) {
@@ -263,6 +269,9 @@ class Section : Page() {
             prefs.notchBar = it; changed(); rebuild()
         }
         if (prefs.notchBar) {
+            toggle(n, getString(R.string.notch_clock), getString(R.string.notch_clock_sub), prefs.notchClock, icon = Icon.Timer) {
+                prefs.notchClock = it; changed(); rebuild()
+            }
             toggle(n, getString(R.string.notch_tap), getString(if (prefs.notchOpens) R.string.notch_tap_on else R.string.notch_tap_off), prefs.notchOpens, icon = Icon.Hand) {
                 prefs.notchOpens = it; changed(); rebuild()
             }
@@ -308,10 +317,16 @@ class Section : Page() {
         toggle(m, getString(R.string.notif_content), getString(R.string.notif_content_sub), prefs.notifContent, icon = Icon.Eye) { prefs.notifContent = it }
         label(getString(R.string.wa_timer_title))
         val wa = group()
-        toggle(wa, getString(R.string.wa_timer_enabled), getString(R.string.wa_timer_sub), prefs.bool(WhatsAppTimer.ENABLED, false), icon = Icon.Timer) {
-            prefs.set(WhatsAppTimer.ENABLED, it)
-            rebuild()
-        }
+        toggle(wa, getString(R.string.wa_timer_enabled), getString(R.string.wa_timer_sub), prefs.bool(WhatsAppTimer.ENABLED, false), icon = Icon.Timer) { setWhatsAppTimerEnabled(it) }
+        val soundUri = prefs.str(WhatsAppTimer.SOUND_URI, "")
+        row(wa, getString(R.string.wa_timer_sound), if (soundUri.isEmpty()) getString(R.string.wa_timer_sound_default) else soundName(Uri.parse(soundUri)),
+            button(getString(R.string.choose), false, Icon.Music) { pickWhatsAppSound() }, Icon.Music)
+        if (soundUri.isNotEmpty()) row(wa, getString(R.string.wa_timer_sound_custom), null,
+            button(getString(R.string.reset), false, Icon.Close) {
+                try { contentResolver.releasePersistableUriPermission(Uri.parse(soundUri), Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) { }
+                prefs.set(WhatsAppTimer.SOUND_URI, "")
+                rebuild()
+            }, Icon.Music)
         val targets = WhatsAppTimer.load(prefs)
         targets.forEachIndexed { index, target ->
             row(wa, target.name, target.number, button(getString(R.string.remove), false, Icon.Trash) {
@@ -319,8 +334,9 @@ class Section : Page() {
                 rebuild()
             }, Icon.User)
         }
-        row(wa, getString(R.string.wa_timer_add), getString(R.string.wa_timer_limit, targets.size),
-            button(getString(R.string.choose), targets.size < 5, Icon.User) { pickWhatsAppContact() }, Icon.Plus)
+        if (targets.size < 5) row(wa, getString(R.string.wa_timer_add), getString(R.string.wa_timer_limit, targets.size),
+            button(getString(R.string.choose), false, Icon.User) { pickWhatsAppContact() }, Icon.Plus)
+        else row(wa, getString(R.string.wa_timer_add), getString(R.string.wa_timer_limit, targets.size), icon = Icon.Plus)
         label(getString(R.string.system))
         val s = group()
         for ((key, title, detail, icon) in listOf(
@@ -422,11 +438,69 @@ class Section : Page() {
         startActivityForResult(Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI), REQ_WA_CONTACT)
     }
 
+    private fun setWhatsAppTimerEnabled(enabled: Boolean) {
+        if (!enabled) {
+            prefs.set(WhatsAppTimer.ENABLED, false)
+            rebuild()
+            return
+        }
+        if (WhatsAppTimer.load(prefs).isEmpty()) {
+            toast(getString(R.string.wa_timer_need_contact))
+            rebuild()
+            return
+        }
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            waEnableAfterPermission = true
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_WA_NOTIF)
+            prefs.set(WhatsAppTimer.ENABLED, false)
+            rebuild()
+            return
+        }
+        val manager = getSystemService(android.app.NotificationManager::class.java)
+        if (!manager.areNotificationsEnabled()) {
+            startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
+            prefs.set(WhatsAppTimer.ENABLED, false)
+        } else prefs.set(WhatsAppTimer.ENABLED, true)
+        rebuild()
+    }
+
+    private fun pickWhatsAppSound() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("audio/*", "video/quicktime", "application/octet-stream"))
+        }
+        startActivityForResult(intent, REQ_WA_SOUND)
+    }
+
+    private fun soundName(uri: Uri): String = try {
+        contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        } ?: uri.lastPathSegment ?: getString(R.string.wa_timer_sound_custom)
+    } catch (_: Exception) { getString(R.string.wa_timer_sound_custom) }
+
     @Suppress("DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != REQ_WA_CONTACT || resultCode != RESULT_OK) return
+        if (resultCode != RESULT_OK) return
         val uri = data?.data ?: return
+        if (requestCode == REQ_WA_SOUND) {
+            val name = soundName(uri)
+            val extension = name.substringAfterLast('.', "").lowercase()
+            if (extension !in setOf("mp3", "ogg", "bnk", "wav", "mov")) {
+                toast(getString(R.string.wa_timer_sound_unsupported))
+                return
+            }
+            val oldUri = prefs.str(WhatsAppTimer.SOUND_URI, "")
+            try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) { }
+            if (oldUri.isNotEmpty() && oldUri != uri.toString()) {
+                try { contentResolver.releasePersistableUriPermission(Uri.parse(oldUri), Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) { }
+            }
+            prefs.set(WhatsAppTimer.SOUND_URI, uri.toString())
+            rebuild()
+            return
+        }
+        if (requestCode != REQ_WA_CONTACT) return
         val projection = arrayOf(
             ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
             ContactsContract.CommonDataKinds.Phone.NUMBER,
@@ -723,6 +797,13 @@ class Section : Page() {
     override fun onRequestPermissionsResult(code: Int, perms: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(code, perms, results)
         when (code) {
+            REQ_WA_NOTIF -> {
+                val granted = results.firstOrNull() == PackageManager.PERMISSION_GRANTED
+                if (waEnableAfterPermission && granted) prefs.set(WhatsAppTimer.ENABLED, true)
+                waEnableAfterPermission = false
+                if (!granted) toast(getString(R.string.wa_timer_permission))
+                rebuild()
+            }
             REQ_RADIOS -> {
                 // Fresh names for the tiles, and the row's own state
                 Listener.instance?.let { it.radios.stop(); it.radios.start() }
@@ -750,7 +831,9 @@ class Section : Page() {
         private const val REQ_RADIOS = 7
         private const val REQ_SHOT = 8
         private const val REQ_WALK = 9
+        private const val REQ_WA_NOTIF = 10
         private const val REQ_WA_CONTACT = 7101
+        private const val REQ_WA_SOUND = 7102
         const val MODE = "mode"
         const val LINK = "link"
         const val ISLAND = "island"

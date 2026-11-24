@@ -44,6 +44,7 @@ Tepi juga bisa dibuka dari tile di Quick Settings dan dari pintasan saat ikon Te
 
 **Lainnya:**
 - terjemahan di HP lewat ML Kit, dari menu seleksi teks;
+- notifikasi bersuara untuk pesan WhatsApp dari maksimal lima kontak pilihan, dengan jeda lima menit per kontak dan pilihan audio lokal;
 - island tetap tampil di layar kunci, tapi hanya musik, timer, dan ibadah. Isi pesan, catatan, rak, dan agenda baru terlihat setelah HP dibuka;
 - pilihan aplikasi mana saja yang notifikasinya dibaca Tepi;
 - sakelar utama untuk mematikan semuanya sekaligus.
@@ -58,6 +59,7 @@ Semua izin bisa dinyalakan dari layar pertama Tepi:
 |---|---|
 | Tampil di atas aplikasi lain | Menggambar island dan mengenali aplikasi layar penuh |
 | Akses notifikasi | Membaca lagu yang diputar, pesan masuk, dan notifikasi berprogres |
+| Notifikasi SLand (Android 13+) | Menampilkan peringatan WhatsApp dari kontak pilihan; bunyi diputar terpisah agar notifikasi tidak bersuara ganda |
 | Autostart dan baterai | Xiaomi, Oppo, Vivo, dan Huawei menghentikan Tepi di latar tanpa ini |
 | Aksesibilitas (opsional) | Satu jendela di atas status bar supaya island bisa disentuh di sana, termasuk ketuk kamera |
 
@@ -85,6 +87,7 @@ Tidak ada akun, server, atau analitik. Yang keluar dari HP hanya:
 
 - judul dan artis lagu ke LRCLIB atau NetEase, kalau lirik online nyala;
 - permintaan ke layanan yang kamu sambungkan (Kulia, Todoist, Notion, tautan iCal);
+- nama/nomor kontak WhatsApp pilihan, jeda pemicu, dan audio notifikasi custom disimpan lokal di HP;
 - model terjemahan ML Kit, diunduh sekali setelah kamu setujui;
 - data ke Tepi di laptop, terenkripsi AES dan ditandatangani HMAC, hanya di jaringan lokal.
 

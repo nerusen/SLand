@@ -19,7 +19,7 @@ android {
         minSdk = 29
         targetSdk = 36
         versionCode = 14
-        versionName = "2.3.4"
+        versionName = "2.4.0"
         // Modern phones only; keeps ML Kit's native code small
         ndk { abiFilters += listOf("arm64-v8a") }
         // Where Check for updates and Source code point; must match the

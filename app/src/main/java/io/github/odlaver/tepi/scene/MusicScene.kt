@@ -26,7 +26,7 @@ class MusicScene(host: Host, private val media: Media, private val prefs: Prefs,
     private var lyricIdx = -1
     private var lyricPrev = ""
     private val lyricT = Spring(1f, 0.004f, 260f, 32f)
-    private val rowWidthT = Spring(0f, 0.2f, 260f, 32f)
+    private val rowWidthT = Spring(0f, 0.1f, 220f, 36f)
     private val playLevel = Spring(0f, 0.004f, 160f, 26f)
     private var wasPlaying = false
     private var pausedAt = 0L
@@ -164,7 +164,8 @@ class MusicScene(host: Host, private val media: Media, private val prefs: Prefs,
         val line = rowLine()
         val desired = line?.let { (ui.lyric.measureText(it) + ui.dp(40f)).coerceIn(ui.dp(120f), ui.dp(300f)) } ?: 0f
         rowWidthT.target = desired
-        return rowWidthT.value
+        return if (line == null) rowWidthT.value.coerceAtLeast(0f)
+        else rowWidthT.value.coerceIn(ui.dp(120f), ui.dp(300f))
     }
 
     override fun drawRow(c: Canvas, r: RectF, a: Float) {

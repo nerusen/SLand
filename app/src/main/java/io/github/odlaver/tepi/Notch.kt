@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.RectF
+import android.graphics.Typeface
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -21,6 +22,9 @@ import android.view.WindowManager
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // The landscape notch.
 //
@@ -89,10 +93,39 @@ class Notch(
     // So the shape is instant and the eyes fade in, against the panel's
     // content fading out.
     private val look = Spring(0f, 0.004f, 420f, 40f)
+    private val clockMix = Spring(0f, 0.004f, 280f, 34f)
+    private val markA = Spring(0f, 0.004f, 420f, 34f)
+    private val clockPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = ui.ink
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    }
+    private val markPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = ui.ink
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+    }
+    private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+    private var clockEnabled = false
+    private var nextClockAt = 0L
+    private var clockUntil = 0L
+    private var clockText = ""
+    private var markAt = 0L
+    private var markUntil = 0L
+    private var markPhase = 0f
     // Where the shape is heading: the island asks for this when a panel takes
     // over the edge, and the window is only torn down once the shape has
     // actually finished shrinking
     private var wanted = true
+    private var showPending = false
+    private val beginShape = Runnable {
+        if (!attached || !wanted) return@Runnable
+        showPending = false
+        grow.target = 1f
+        look.target = 1f
+        retouch()
+        kick()
+    }
 
     // The block at the current size setting, measured once in place()
     private var blockW = 0f
@@ -177,10 +210,35 @@ class Notch(
             // appear over the panel's content. The clip also means a shape
             // that is still growing cannot leak an eye outside itself.
             val la = look.value.coerceIn(0f, 1f)
-            if (la <= 0.01f) return
+            val clock = clockMix.value.coerceIn(0f, 1f)
+            if (la <= 0.01f && clock <= 0.01f) return
             canvas.save()
             canvas.clipPath(shape)
-            eye.draw(canvas, body.centerX(), body.centerY(), eyeHeight(blockH, blockW) * k, la)
+            clockPaint.color = ui.ink
+            markPaint.color = ui.ink
+            val eh = eyeHeight(blockH, blockW) * k
+            eye.draw(canvas, body.centerX(), body.centerY(), eh, la * (1f - clock))
+            if (clock > 0.01f) {
+                clockPaint.textSize = blockH * 0.53f * k
+                val metrics = clockPaint.fontMetrics
+                val baseline = body.centerY() - (metrics.ascent + metrics.descent) / 2f
+                val scale = 0.92f + 0.08f * clock
+                canvas.save()
+                canvas.scale(scale, scale, body.centerX(), body.centerY())
+                clockPaint.alpha = (255 * la * clock).toInt().coerceIn(0, 255)
+                canvas.drawText(clockText, body.centerX(), baseline, clockPaint)
+                canvas.restore()
+            }
+            val ma = markA.value.coerceIn(0f, 1f) * (1f - clock)
+            if (ma > 0.01f && eh > 0f) {
+                markPaint.textSize = blockH * 0.62f * k
+                val metrics = markPaint.fontMetrics
+                val bob = sin(markPhase.toDouble()).toFloat() * blockH * 0.12f
+                val baseline = body.centerY() - (metrics.ascent + metrics.descent) / 2f + bob
+                val cx = body.centerX() + eye.pairWidth(eh) / 2f + blockH * 0.20f
+                markPaint.alpha = (255 * la * ma).toInt().coerceIn(0, 255)
+                canvas.drawText("!", cx, baseline, markPaint)
+            }
             canvas.restore()
         }
 
@@ -290,7 +348,7 @@ class Notch(
     // passing it on. The flag is the only thing that makes the tap fall
     // through to the island below.
     private fun flagsNow() = baseFlags or
-        if (wanted) 0 else WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        if (wanted && !showPending) 0 else WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
 
     private fun retouch() {
         if (!attached) return
@@ -312,6 +370,7 @@ class Notch(
     fun show(grown: Boolean) {
         wanted = true
         if (attached) {
+            if (showPending) return
             grow.target = 1f
             look.target = 1f
             place(false)
@@ -329,10 +388,12 @@ class Notch(
         // block with no face on it until something else happened to ask for a
         // refresh. Closing the panel by tapping the island again asked twice
         // and so repaired itself; tapping outside it asked once and did not.
+        showPending = !grown
         grow.snap(if (grown) 1f else 0f)
         look.snap(0f)
-        grow.target = 1f
-        look.target = 1f
+        grow.target = if (grown) 1f else 0f
+        look.target = if (grown) 1f else 0f
+        lp.flags = flagsNow()
         try {
             wm.addView(face, lp)
             attached = true
@@ -341,7 +402,18 @@ class Notch(
             placedFor = ""
             return
         }
+        if (showPending) main.postDelayed(beginShape, SHAPE_DELAY_MS)
+        else { grow.target = 1f; look.target = 1f }
         kick()
+    }
+
+    fun clock(enabled: Boolean) {
+        if (clockEnabled == enabled) return
+        clockEnabled = enabled
+        clockUntil = 0L
+        nextClockAt = if (enabled) SystemClock.uptimeMillis() + CLOCK_INTERVAL else 0L
+        clockMix.target = 0f
+        if (attached) kick()
     }
 
     // Shrink the notch back into the edge, and take the window down when it
@@ -349,6 +421,8 @@ class Notch(
     fun close() {
         if (!attached) { drop(); return }
         if (!wanted) return
+        main.removeCallbacks(beginShape)
+        showPending = false
         wanted = false
         grow.target = 0f
         look.target = 0f
@@ -362,11 +436,15 @@ class Notch(
         wanted = false
         grow.snap(0f)
         look.snap(0f)
+        clockMix.snap(0f)
+        markA.snap(0f)
         drop()
     }
 
     private fun drop() {
         main.removeCallbacks(wake)
+        main.removeCallbacks(beginShape)
+        showPending = false
         if (!attached) return
         Choreographer.getInstance().removeFrameCallback(frame)
         ticking = false
@@ -395,6 +473,9 @@ class Notch(
     fun startled() {
         if (!attached || !wanted) return
         eye.startled()
+        markAt = SystemClock.uptimeMillis() + MARK_DELAY
+        markUntil = markAt + MARK_DURATION
+        markA.snap(0f)
         kick()
     }
 
@@ -407,6 +488,43 @@ class Notch(
     private val frame = Choreographer.FrameCallback { ns -> tick(ns) }
     private val wake = Runnable { kick() }
 
+    private fun updateEvents(now: Long) {
+        if (clockEnabled) {
+            if (clockUntil > 0L && now >= clockUntil) {
+                clockUntil = 0L
+                nextClockAt = now + CLOCK_INTERVAL
+                clockMix.target = 0f
+            }
+            if (clockUntil == 0L && now >= nextClockAt) {
+                clockUntil = now + CLOCK_DURATION
+                clockText = timeFormat.format(Date())
+                clockMix.target = 1f
+            }
+        } else {
+            clockMix.target = 0f
+        }
+        if (markAt > 0L && now >= markAt) {
+            markAt = 0L
+            markUntil = now + MARK_DURATION
+            markA.target = 1f
+        }
+        if (markUntil > 0L && now >= markUntil) {
+            markUntil = 0L
+            markA.target = 0f
+        }
+    }
+
+    private fun idleWait(): Long {
+        val now = SystemClock.uptimeMillis()
+        val nextEvent = listOfNotNull(
+            nextClockAt.takeIf { clockEnabled && clockUntil == 0L && it > now },
+            clockUntil.takeIf { clockEnabled && it > now },
+            markAt.takeIf { it > now },
+            markUntil.takeIf { it > now },
+        ).minOrNull() ?: Long.MAX_VALUE
+        return minOf(eye.idleWait(), (nextEvent - now).coerceIn(16L, 120_000L))
+    }
+
     private fun kick() {
         if (!attached || ticking) return
         ticking = true
@@ -417,10 +535,18 @@ class Notch(
 
     private fun tick(ns: Long) {
         if (!attached) { ticking = false; return }
+        val now = SystemClock.uptimeMillis()
+        updateEvents(now)
         val dt = if (lastNs == 0L) 1f / 60f else ((ns - lastNs) / 1e9f).coerceIn(0f, 1f / 20f)
         lastNs = ns
         var moving = grow.step(dt)
         moving = look.step(dt) or moving
+        moving = clockMix.step(dt) or moving
+        moving = markA.step(dt) or moving
+        if (markUntil > now && markA.value > 0.01f) {
+            markPhase = (markPhase + dt * MARK_RATE) % (Math.PI.toFloat() * 2f)
+            moving = true
+        }
         // A shape on its way out has nothing to express, and stepping the eye
         // through the exit would start a blink nobody can see
         if (wanted) moving = eye.step(dt) or moving
@@ -436,7 +562,7 @@ class Notch(
         else {
             ticking = false
             // A shape that is staying still is still on the blink timer
-            if (wanted) main.postDelayed(wake, eye.idleWait())
+            if (wanted) main.postDelayed(wake, idleWait())
         }
     }
 
@@ -470,6 +596,12 @@ class Notch(
         // are not corners at all any more: they flare outwards, and that
         // dimension lives in Ui because the panel uses the same one.
         const val CORNER = 0.42f
+        private const val CLOCK_INTERVAL = 120_000L
+        private const val CLOCK_DURATION = 20_000L
+        private const val MARK_DELAY = 220L
+        private const val MARK_DURATION = 1_800L
+        private const val MARK_RATE = 6.2f
+        private const val SHAPE_DELAY_MS = 120L
 
         // The block at the hundred per cent setting: how far it hangs down from
         // the top edge, and how wide it is along it. The size slider scales

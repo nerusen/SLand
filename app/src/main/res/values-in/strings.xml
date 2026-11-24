@@ -17,10 +17,20 @@
     <string name="notif_content">Tampilkan isi pesan</string>
     <string name="notif_content_sub">Disembunyikan selama HP terkunci.</string>
     <string name="wa_timer_title">Timer WhatsApp</string>
-    <string name="wa_timer_enabled">Mulai timer 10 detik</string>
-    <string name="wa_timer_sub">Memulai timer Jam Android saat kontak yang dipilih mengirim pesan WhatsApp. Target dapat memicu lagi setelah 5 menit.</string>
+    <string name="wa_timer_enabled">Putar notifikasi khusus</string>
+    <string name="wa_timer_sub">Menampilkan notifikasi SLand senyap dan memutar satu bunyi saat kontak pilihan mengirim pesan WhatsApp. Setiap kontak memiliki jeda 5 menit.</string>
     <string name="wa_timer_add">Kontak target</string>
     <string name="wa_timer_limit">%1$d dari 5 kontak dipilih</string>
+    <string name="wa_timer_sound">Bunyi notifikasi</string>
+    <string name="wa_timer_sound_default">Bunyi OGG SLand</string>
+    <string name="wa_timer_sound_custom">Bunyi khusus dipilih</string>
+    <string name="wa_timer_sound_unsupported">Pilih berkas MP3, OGG, BNK, WAV, atau MOV.</string>
+    <string name="wa_timer_permission">Izinkan notifikasi SLand untuk menggunakan fitur ini.</string>
+    <string name="wa_timer_need_contact">Pilih setidaknya satu kontak target terlebih dahulu.</string>
+    <string name="wa_timer_channel">Notifikasi kontak WhatsApp</string>
+    <string name="wa_timer_notification_title">Pesan WhatsApp dari %1$s</string>
+    <string name="wa_timer_notification_body">Kontak pilihanmu mengirim pesan.</string>
+    <string name="reset">Atur ulang</string>
     <string name="remove">Hapus</string>
     <string name="offset">Posisi vertikal</string>
     <string name="idle_bar">Capsule selalu tampil</string>
@@ -128,7 +138,7 @@
     <string name="copy">Salin</string>
     <string name="share">Bagikan</string>
     <string name="reads_intro">Tepi tidak punya akun dan server. Data tetap di HP kecuali yang disebut di sini.</string>
-    <string name="reads_listener">Membaca lagu yang diputar dan pesan masuk untuk ditampilkan di island. Tidak disimpan dan tidak dikirim.</string>
+    <string name="reads_listener">Membaca media dan notifikasi masuk. Jika diaktifkan, nama/nomor target WhatsApp dan jeda pemicu disimpan di HP ini; audio pilihan juga tetap lokal. Isi notifikasi dan kontak tidak dikirim ke server SLand.</string>
     <string name="reads_access">Membuka satu jendela di atas status bar supaya island bisa disentuh. Hanya tahu saat aplikasi bank yang terdaftar dibuka, lalu mematikan dirinya. Tidak membaca isi layar.</string>
     <string name="reads_overlay">Menggambar island di atas aplikasi lain.</string>
     <string name="reads_lyrics">Mengirim judul dan artis lagu ke LRCLIB, lalu NetEase. Lirik disimpan di HP.</string>
@@ -434,6 +444,8 @@
 
     <!-- Poni mode landscape, dan mata di dalamnya -->
     <string name="notch">Mode landscape</string>
+    <string name="notch_clock">Tampilkan jam digital</string>
+    <string name="notch_clock_sub">Jam tampil selama 20 detik setiap dua menit.</string>
     <string name="notch_bar">Poni saat landscape</string>
     <string name="notch_bar_sub">Saat HP dimiringkan, island tidak punya tempat untuk tampil, jadi berubah menjadi blok kecil yang menggantung di tengah tepi atas dengan sepasang mata di dalamnya. Mata itu berkedip, melebar saat ada notifikasi dari aplikasi lain, dan menyipit menjadi bulan sabit merah saat baterai hampir habis. Buka island di sini dan blok itu tumbuh menjadi panel; tutup, dan matanya kembali.</string>
     <string name="notch_tap">Ketuk membuka menu</string>

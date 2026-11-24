@@ -156,6 +156,7 @@ class Listener : NotificationListenerService() {
         if (sbn.packageName != packageName) AppFilter.saw(prefs, sbn.packageName)
         val own = sbn.packageName == packageName
         val code = if (!own && pc.linked && pc.sendOtp) otpFrom(sbn) else null
+        // User turned this app off
         if (!AppFilter.allowed(prefs, sbn.packageName)) return
         live.posted(sbn)
         if (!own && code == null && pc.linked && pc.online) forward(sbn, rankingMap)
@@ -177,7 +178,16 @@ class Listener : NotificationListenerService() {
         isl.show(built)
     }
 
-    private fun startWhatsAppTimerIfMatched(sbn: StatusBarNotification) { val n = sbn.notification; if (sbn.isOngoing || n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return; val (title, _) = chat(n); if (prefs.bool(WhatsAppTimer.ENABLED, false)) WhatsAppTimer.matches(prefs, title, n)?.let { target -> WhatsAppTimer.startSystemTimer(this, target, prefs) } }
+    private fun startWhatsAppTimerIfMatched(sbn: StatusBarNotification) {
+        if (!prefs.bool(WhatsAppTimer.ENABLED, false)) return
+        val n = sbn.notification
+        if (sbn.isOngoing || !isMessage(n) || n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+        val (title, _) = chat(n)
+        WhatsAppTimer.matches(prefs, title, n)?.let { target ->
+            WhatsAppTimer.notifyTarget(this, target, prefs)
+        }
+    }
+
     private fun isMessage(n: Notification): Boolean { if (n.extras.containsKey(Notification.EXTRA_MEDIA_SESSION)) return false; if (n.category == Notification.CATEGORY_MESSAGE || n.category == Notification.CATEGORY_EMAIL) return true; if (n.extras.containsKey(Notification.EXTRA_MESSAGES)) return true; return n.actions?.any { it.remoteInputs?.isNotEmpty() == true } == true }
     private fun chat(n: Notification): Pair<String, String> { val x = n.extras; val conv = x.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()?.trim()?.takeIf { it.isNotEmpty() }; val last = lastBundle(n); val sender = last?.let { senderOf(it) }; val group = x.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION) && conv != null; val body = last?.getCharSequence("text")?.toString()?.trim()?.takeIf { it.isNotEmpty() } ?: x.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim().orEmpty(); val title = (if (group) conv else sender ?: conv ?: x.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim()).orEmpty(); return title to (if (group && sender != null) "$sender: $body" else body) }
 
