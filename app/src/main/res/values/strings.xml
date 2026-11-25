@@ -19,7 +19,7 @@
     <string name="notif_content_sub">Hidden while the phone is locked.</string>
     <string name="wa_timer_title">WhatsApp timer</string>
     <string name="wa_timer_enabled">Play a custom alert</string>
-    <string name="wa_timer_sub">Shows a silent SLand notification and plays one alert when a selected contact sends a WhatsApp message. Each contact has a 5-minute cooldown.</string>
+    <string name="wa_timer_sub">Plays one alert per WhatsApp message from a selected contact. Several messages from the same contact each get their own sound, so an urgent burst is heard as a run of alerts instead of one.</string>
     <string name="wa_timer_add">Target contacts</string>
     <string name="wa_timer_limit">%1$d of 5 contacts selected</string>
     <string name="wa_timer_sound">Alert sound</string>
@@ -141,7 +141,7 @@
     <string name="copy">Copy</string>
     <string name="share">Share</string>
     <string name="reads_intro">Tepi has no account and no server. Data stays on the phone except where listed.</string>
-    <string name="reads_listener">Reads media and incoming notifications. If enabled, WhatsApp target names/numbers and cooldowns are stored on this phone; the chosen alert audio is also kept local. Notification text and contacts are not sent to SLand servers.</string>
+    <string name="reads_listener">Reads media and incoming notifications. If enabled, WhatsApp target names/numbers are stored on this phone; the chosen alert audio is also kept local. Notification text and contacts are not sent to SLand servers.</string>
     <string name="reads_access">Opens one window above the status bar so the island can be tapped. Hears only when a listed banking app opens, then switches itself off. Reads no screen content.</string>
     <string name="reads_overlay">Draws the island over other apps.</string>
     <string name="reads_lyrics">Sends the song title and artist to LRCLIB, then NetEase. Lyrics are cached on the phone.</string>

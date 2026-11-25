@@ -20,9 +20,19 @@ object WhatsAppTimer {
     const val ENABLED = "wa.timer.enabled"
     const val CONTACTS = "wa.timer.contacts"
     const val SOUND_URI = "wa.timer.sound.uri"
-    const val COOLDOWN_MS = 5 * 60_000L
+
+    // Different messages posted with the same notification id inside one
+    // Android update collapse into a single callback, so the id carries the
+    // message count forward — that is what lets one sound fire per message.
+    private const val NOTIFY_ID_BASE = 0x5741000
     private const val CHANNEL_ID = "whatsapp_target_alert"
+
     private var player: MediaPlayer? = null
+    private var playingId = 0
+    private var playing = false
+    private var queued = 0
+    private var appContext: Context? = null
+    private var soundUri: String? = null
 
     fun load(prefs: Prefs): List<WhatsAppTimerTarget> {
         val raw = prefs.str(CONTACTS, "")
@@ -89,34 +99,58 @@ object WhatsAppTimer {
     }
 
     fun notifyTarget(context: Context, target: WhatsAppTimerTarget, prefs: Prefs): Boolean {
-        val now = System.currentTimeMillis()
-        val key = "wa.timer.cooldown." + target.number
-        val last = prefs.long(key, 0)
-        if (last > 0 && now - last < COOLDOWN_MS) return false
         return try {
             val manager = context.getSystemService(NotificationManager::class.java)
             if (!manager.areNotificationsEnabled()) return false
             ensureChannel(context, manager)
             if (manager.getNotificationChannel(CHANNEL_ID)?.importance == NotificationManager.IMPORTANCE_NONE) return false
-            val open = PendingIntent.getActivity(
-                context, target.number.hashCode(), Intent(context, MainActivity::class.java),
+
+            // Android only delivers a notification callback when the message is
+            // distinct from the one already showing with that id. Two WhatsApp
+            // messages can carry the same sender and body (two "ping"s, a
+            // pasted link twice), so the id changes with every message: each one
+            // reads as new and gets its own alert. The previous one for this
+            // contact is dismissed first, so the shade still shows a single
+            // line per contact instead of a stack.
+            val prevKey = "wa.timer.prev." + target.number
+            val prevId = prefs.int(prevKey, 0)
+            if (prevId != 0) manager.cancel(prevId)
+            val id = nextId(prefs, target)
+            prefs.set(prevKey, id)
+            val open = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            val pending = PendingIntent.getActivity(
+                context, id, open,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
             val notification = Notification.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_mark)
                 .setContentTitle(context.getString(R.string.wa_timer_notification_title, target.name))
                 .setContentText(context.getString(R.string.wa_timer_notification_body))
-                .setContentIntent(open)
+                .setContentIntent(pending)
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(true)
                 .build()
-            manager.notify(target.number.hashCode(), notification)
-            prefs.set(key, now)
-            playSound(context, prefs)
+            manager.notify(id, notification)
+            // Sounds are queued, not restarted: three messages landing together
+            // are three sounds in a row rather than the last one cutting off the
+            // rest. The silent channel keeps Android's own sound out of the way,
+            // so exactly one sound is heard per message.
+            sound(context, prefs)
             true
         } catch (_: Exception) {
             false
         }
+    }
+
+    // A per-contact notification id that changes with every message, so each
+    // one is a fresh callback rather than an update of the one before it.
+    private fun nextId(context: Context, prefs: Prefs, target: WhatsAppTimerTarget): Int {
+        val key = "wa.timer.id." + target.number
+        val base = target.number.hashCode() and 0xff
+        val seen = prefs.long(key, 0)
+        val id = NOTIFY_ID_BASE or (base shl 8) or ((seen and 0xffL).toInt())
+        prefs.set(key, (seen + 1) and 0xffL)
+        return id
     }
 
     private fun ensureChannel(context: Context, manager: NotificationManager) {
@@ -127,42 +161,70 @@ object WhatsAppTimer {
         manager.createNotificationChannel(channel)
     }
 
+    // The queue itself. Every matching message adds one sound. The first plays
+    // at once, because the contact is reaching out now; if a sound is already
+    // running, the new one waits its turn instead of cutting it off, and plays
+    // the moment the one before it ends. Three messages in a minute are three
+    // alerts in a row — one sound per message, and the last always plays.
     @Synchronized
-    private fun playSound(context: Context, prefs: Prefs) {
-        startSound(context, prefs.str(SOUND_URI, "").takeIf { it.isNotBlank() })
+    private fun sound(context: Context, prefs: Prefs) {
+        appContext = context.applicationContext
+        soundUri = prefs.str(SOUND_URI, "").takeIf { it.isNotBlank() }
+        if (playing) {
+            queued++
+            return
+        }
+        playing = true
+        startSound()
     }
 
-    @Synchronized
-    private fun startSound(context: Context, customUri: String?) {
-        try { player?.release() } catch (_: Exception) { }
-        player = null
+    private fun startSound() {
+        val context = appContext
+        if (context == null) {
+            playing = false
+            player = null
+            queued = 0
+            return
+        }
+        val id = ++playingId
         val next = MediaPlayer()
+        try { player?.release() } catch (_: Exception) { }
         player = next
         next.setAudioAttributes(AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_NOTIFICATION)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build())
         try {
-            if (customUri != null) next.setDataSource(context, Uri.parse(customUri))
+            val uri = soundUri
+            if (uri != null) next.setDataSource(context, Uri.parse(uri))
             else next.setDataSource(defaultSound(context).absolutePath)
             next.setOnPreparedListener { it.start() }
-            next.setOnCompletionListener { releasePlayer(it) }
+            next.setOnCompletionListener { mp ->
+                try { mp.release() } catch (_: Exception) { }
+                if (playingId == id) nextSound()
+            }
             next.setOnErrorListener { mp, _, _ ->
-                releasePlayer(mp)
-                if (customUri != null) startSound(context, null)
+                try { mp.release() } catch (_: Exception) { }
+                if (playingId == id) nextSound()
                 true
             }
             next.prepareAsync()
         } catch (_: Exception) {
-            releasePlayer(next)
-            if (customUri != null) startSound(context, null)
+            try { next.release() } catch (_: Exception) { }
+            if (playingId == id) nextSound()
         }
     }
 
     @Synchronized
-    private fun releasePlayer(mp: MediaPlayer) {
-        if (player === mp) player = null
-        try { mp.release() } catch (_: Exception) { }
+    private fun nextSound() {
+        if (queued > 0) {
+            queued--
+            startSound()
+        } else {
+            playing = false
+            player = null
+            appContext = null
+        }
     }
 
     private fun defaultSound(context: Context): File {
