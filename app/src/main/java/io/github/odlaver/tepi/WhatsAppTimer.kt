@@ -9,7 +9,6 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
-import android.os.Build
 import java.io.File
 import java.io.FileOutputStream
 import org.json.JSONArray
@@ -120,7 +119,6 @@ object WhatsAppTimer {
                 .setContentIntent(pending)
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(true)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) builder.setSilent(true)
             manager.notify(id, builder.build())
             // Sounds are queued, not restarted: three messages landing together
             // are three sounds in a row rather than the last one cutting off the
