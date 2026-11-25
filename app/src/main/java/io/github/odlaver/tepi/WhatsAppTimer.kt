@@ -144,7 +144,7 @@ object WhatsAppTimer {
 
     // A per-contact notification id that changes with every message, so each
     // one is a fresh callback rather than an update of the one before it.
-    private fun nextId(context: Context, prefs: Prefs, target: WhatsAppTimerTarget): Int {
+    private fun nextId(prefs: Prefs, target: WhatsAppTimerTarget): Int {
         val key = "wa.timer.id." + target.number
         val base = target.number.hashCode() and 0xff
         val seen = prefs.long(key, 0)
