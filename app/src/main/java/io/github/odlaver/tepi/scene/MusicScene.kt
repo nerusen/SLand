@@ -26,7 +26,16 @@ class MusicScene(host: Host, private val media: Media, private val prefs: Prefs,
     private var lyricIdx = -1
     private var lyricPrev = ""
     private val lyricT = Spring(1f, 0.004f, 260f, 32f)
+    // The lyric bar's width, and the width it is heading for. The spring is
+    // stepped in step() and read back through rowWidth(); the target is kept so
+    // drawRow can lay its text out to the width the bar will end up at instead of
+    // the width it happens to be part-way through. Both matter: the island
+    // samples rowWidth() twice per refresh, so a spring advanced from the getter
+    // handed each sample a different number, and a text box that shrank and grew
+    // with the bar re-cut the line on every frame. Together those are the shake
+    // the capsule showed while it resized.
     private val rowWidthT = Spring(0f, 0.1f, 220f, 36f)
+    private var rowWide = 0f
     private val playLevel = Spring(0f, 0.004f, 160f, 26f)
     private var wasPlaying = false
     private var pausedAt = 0L
@@ -116,10 +125,21 @@ class MusicScene(host: Host, private val media: Media, private val prefs: Prefs,
         playLevel.target = if (media.playing) 1f else 0f
         var moving = playLevel.step(dt)
         moving = lyricT.step(dt) or moving
+        // Advance the width here, alongside every other spring the island
+        // animates, and never from rowWidth().
+        rowWide = rowTarget()
+        rowWidthT.target = rowWide
         val widthMoving = rowWidthT.step(dt)
         moving = widthMoving or moving
         if (updateLyric() || widthMoving) host.refresh()
         return moving
+    }
+
+    // The width the bar wants to be, measured from the line it is showing. Zero
+    // when there is no lyric, which closes the capsule.
+    private fun rowTarget(): Float {
+        val line = rowLine() ?: return 0f
+        return (ui.lyric.measureText(line) + ui.dp(40f)).coerceIn(ui.dp(120f), ui.dp(300f))
     }
 
     private fun currentLine(): String? {
@@ -160,19 +180,20 @@ class MusicScene(host: Host, private val media: Media, private val prefs: Prefs,
         bars(c, right.right - s / 2, right.centerY(), s * 0.8f, a)
     }
 
-    override fun rowWidth(): Float {
-        val line = rowLine()
-        val desired = line?.let { (ui.lyric.measureText(it) + ui.dp(40f)).coerceIn(ui.dp(120f), ui.dp(300f)) } ?: 0f
-        rowWidthT.target = desired
-        return if (line == null) rowWidthT.value.coerceAtLeast(0f)
-        else rowWidthT.value.coerceIn(ui.dp(120f), ui.dp(300f))
-    }
+    // A pure getter: the width the bar has actually reached. The island samples
+    // it twice per refresh, once for the shape and once for the text, so nothing
+    // here may move the animation.
+    override fun rowWidth() = rowWidthT.value
 
     override fun drawRow(c: Canvas, r: RectF, a: Float) {
         val line = rowLine() ?: return
         val k = lyricT.value.coerceIn(0f, 1f)
         val shift = ui.dp(10f)
-        val w = r.width() - ui.s24
+        // Laid out to the width the bar is heading for rather than the width it
+        // has reached. Ellipsizing to a box that is still moving picks a slightly
+        // different cut of the line every frame, which is what made the text look
+        // like it was shuffling sideways under an otherwise still capsule.
+        val w = (if (rowWide > 0f) rowWide else r.width()) - ui.s24
         if (k < 1f && lyricPrev.isNotEmpty()) ui.centered(c, lyricPrev, ui.lyric, r.centerX(), r.centerY() - shift * k, w, a * (1 - k))
         ui.centered(c, line, ui.lyric, r.centerX(), r.centerY() + shift * (1 - k), w, a * k)
     }

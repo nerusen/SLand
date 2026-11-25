@@ -2,7 +2,9 @@ package io.github.odlaver.tepi
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PixelFormat
@@ -96,16 +98,23 @@ class Notch(
     // content fading out.
     private val look = Spring(0f, 0.004f, 420f, 40f)
     private val clockMix = Spring(0f, 0.004f, 280f, 34f)
-    private val markA = Spring(0f, 0.004f, 420f, 34f)
+    private val markA = Spring(0f, 0.004f, 260f, 28f)
+    private val waveA = Spring(0f, 0.004f, 260f, 30f)
     private val clockPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = ui.ink
         textAlign = Paint.Align.CENTER
-        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+        isFakeBoldText = true
+        fontFeatureSettings = "tnum"
     }
     private val markPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = ui.ink
         textAlign = Paint.Align.CENTER
         typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+        isFakeBoldText = true
+        style = Paint.Style.FILL_AND_STROKE
+        strokeJoin = Paint.Join.ROUND
+        strokeCap = Paint.Cap.ROUND
     }
     private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     private var clockEnabled = false
@@ -115,6 +124,9 @@ class Notch(
     private var markAt = 0L
     private var markUntil = 0L
     private var markPhase = 0f
+    private var nextWaveAt = 0L
+    private var waveUntil = 0L
+    private var wavePhase = 0f
     // Where the shape is heading: the island asks for this when a panel takes
     // over the edge, and the window is only torn down once the shape has
     // actually finished shrinking
@@ -159,6 +171,14 @@ class Notch(
         private val bg = Paint(Paint.ANTI_ALIAS_FLAG)
         private val shape = Path()
         private val body = RectF()
+        private val handPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+        private val handHalo = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL_AND_STROKE }
+        private val handPath = Path()
+        private val handPart = Path()
+        private val handMat = Matrix()
+        private val handRect = RectF()
+        private var handFor = -1f
+        private var handBlurFor = -1f
 
         private var downX = 0f
         private var downY = 0f
@@ -221,7 +241,7 @@ class Notch(
             val eh = eyeHeight(blockH, blockW) * k
             eye.draw(canvas, body.centerX(), body.centerY(), eh, la * (1f - clock))
             if (clock > 0.01f) {
-                clockPaint.textSize = blockH * 0.53f * k
+                clockPaint.textSize = blockH * 0.43f * k
                 val metrics = clockPaint.fontMetrics
                 val baseline = body.centerY() - (metrics.ascent + metrics.descent) / 2f
                 val scale = 0.92f + 0.08f * clock
@@ -234,14 +254,67 @@ class Notch(
             val ma = markA.value.coerceIn(0f, 1f) * (1f - clock)
             if (ma > 0.01f && eh > 0f) {
                 markPaint.textSize = blockH * 0.62f * k
+                markPaint.strokeWidth = max(ui.dp(0.8f), markPaint.textSize * 0.06f)
                 val metrics = markPaint.fontMetrics
-                val bob = sin(markPhase.toDouble()).toFloat() * blockH * 0.12f
+                val bob = sin(markPhase.toDouble()).toFloat() * blockH * 0.065f * ma
                 val baseline = body.centerY() - (metrics.ascent + metrics.descent) / 2f + bob
                 val cx = body.centerX() + eye.pairWidth(eh) / 2f + blockH * 0.20f
+                val pop = 0.85f + 0.15f * ma + 0.035f * sin(markPhase.toDouble()).toFloat() * ma
                 markPaint.alpha = (255 * la * ma).toInt().coerceIn(0, 255)
+                canvas.save()
+                canvas.scale(pop, pop, cx, body.centerY() + bob)
                 canvas.drawText("!", cx, baseline, markPaint)
+                canvas.restore()
+            }
+            val wa = waveA.value.coerceIn(0f, 1f) * (1f - clock) * (1f - ma)
+            if (wa > 0.01f && eh > 0f) {
+                val hs = min(eh * 1.25f, dep * 0.78f)
+                if (hs > 2f) {
+                    if (kotlin.math.abs(hs - handFor) > 0.5f) buildHand(hs)
+                    val hx = min(body.centerX() + eh * 1.85f, body.right - r * 0.6f - hs * 0.52f)
+                    val hy = body.centerY() + hs * 0.36f
+                    val angle = 6f + 16f * sin(wavePhase.toDouble()).toFloat()
+                    val handPop = 0.72f + 0.28f * wa
+                    val blur = max(ui.dp(1.5f), hs * 0.26f)
+                    if (kotlin.math.abs(blur - handBlurFor) > 0.5f) {
+                        handBlurFor = blur
+                        handHalo.maskFilter = BlurMaskFilter(blur, BlurMaskFilter.Blur.NORMAL)
+                    }
+                    val haloA = (0.36f + 0.14f * (0.5f + 0.5f * sin(wavePhase.toDouble()).toFloat())) * la * wa
+                    handHalo.color = ui.alpha(ui.ink, haloA)
+                    handHalo.strokeWidth = max(ui.dp(1f), blur * 0.45f)
+                    handPaint.color = ui.alpha(ui.ink, la * wa)
+                    canvas.save()
+                    canvas.translate(hx, hy)
+                    canvas.scale(handPop, handPop)
+                    canvas.rotate(angle)
+                    canvas.drawPath(handPath, handHalo)
+                    canvas.drawPath(handPath, handPaint)
+                    canvas.restore()
+                }
             }
             canvas.restore()
+        }
+
+        private fun buildHand(s: Float) {
+            handFor = s
+            handPath.reset()
+            handRect.set(-0.27f * s, -0.52f * s, 0.27f * s, -0.02f * s)
+            handPath.addRoundRect(handRect, 0.24f * s, 0.24f * s, Path.Direction.CW)
+            addFinger(-0.18f * s, -0.75f * s, -0.36f * s, 0.115f * s, -8f, -0.18f * s, -0.38f * s)
+            addFinger(-0.06f * s, -0.83f * s, -0.38f * s, 0.115f * s, -2f, -0.06f * s, -0.40f * s)
+            addFinger(0.06f * s, -0.80f * s, -0.38f * s, 0.115f * s, 3f, 0.06f * s, -0.40f * s)
+            addFinger(0.18f * s, -0.69f * s, -0.34f * s, 0.11f * s, 10f, 0.18f * s, -0.36f * s)
+            addFinger(-0.22f * s, -0.43f * s, -0.13f * s, 0.125f * s, -40f, -0.16f * s, -0.15f * s)
+        }
+
+        private fun addFinger(cx: Float, top: Float, bot: Float, w: Float, deg: Float, px: Float, py: Float) {
+            handPart.reset()
+            handRect.set(cx - w / 2f, top, cx + w / 2f, bot)
+            handPart.addRoundRect(handRect, w / 2f, w / 2f, Path.Direction.CW)
+            handMat.setRotate(deg, px, py)
+            handPart.transform(handMat)
+            handPath.op(handPart, Path.Op.UNION)
         }
 
         // A tap, and only a tap.
@@ -404,6 +477,9 @@ class Notch(
             placedFor = ""
             return
         }
+        if (nextWaveAt == 0L) {
+            nextWaveAt = SystemClock.uptimeMillis() + WAVE_FIRST_DELAY
+        }
         if (showPending) main.postDelayed(beginShape, SHAPE_DELAY_MS)
         else { grow.target = 1f; look.target = 1f }
         kick()
@@ -426,6 +502,9 @@ class Notch(
         main.removeCallbacks(beginShape)
         showPending = false
         wanted = false
+        waveUntil = 0L
+        waveA.target = 0f
+        eye.wave(false)
         grow.target = 0f
         look.target = 0f
         retouch()
@@ -436,6 +515,10 @@ class Notch(
     // to watch the shape go
     fun hide() {
         wanted = false
+        waveUntil = 0L
+        nextWaveAt = 0L
+        waveA.snap(0f)
+        eye.wave(false)
         grow.snap(0f)
         look.snap(0f)
         clockMix.snap(0f)
@@ -477,6 +560,7 @@ class Notch(
         eye.startled()
         markAt = SystemClock.uptimeMillis() + MARK_DELAY
         markUntil = markAt + MARK_DURATION
+        markPhase = 0f
         markA.snap(0f)
         kick()
     }
@@ -498,11 +582,16 @@ class Notch(
                 clockMix.target = 0f
             }
             if (clockUntil == 0L && now >= nextClockAt) {
-                clockUntil = now + CLOCK_DURATION
-                clockText = timeFormat.format(Date())
-                clockMix.target = 1f
+                if (waveUntil > 0L) {
+                    nextClockAt = waveUntil + WAVE_GAP
+                } else {
+                    clockUntil = now + CLOCK_DURATION
+                    clockText = timeFormat.format(Date())
+                    clockMix.target = 1f
+                }
             }
         } else {
+            clockUntil = 0L
             clockMix.target = 0f
         }
         if (markAt > 0L && now >= markAt) {
@@ -514,6 +603,25 @@ class Notch(
             markUntil = 0L
             markA.target = 0f
         }
+        if (waveUntil > 0L && now >= waveUntil) {
+            waveUntil = 0L
+            nextWaveAt = now + WAVE_INTERVAL
+            waveA.target = 0f
+            eye.wave(false)
+        } else if (waveUntil == 0L && nextWaveAt > 0L && now >= nextWaveAt) {
+            val clockConflict = clockEnabled && (clockUntil > 0L || (nextClockAt > 0L && nextClockAt - now < WAVE_DURATION + WAVE_GAP))
+            if (clockConflict) {
+                val clearAt = if (clockUntil > 0L) clockUntil else nextClockAt + CLOCK_DURATION
+                nextWaveAt = clearAt + WAVE_GAP
+            } else if (markAt > 0L || markUntil > 0L) {
+                nextWaveAt = max(markAt, markUntil) + 2_000L
+            } else {
+                waveUntil = now + WAVE_DURATION
+                wavePhase = 0f
+                waveA.target = 1f
+                eye.wave(true)
+            }
+        }
     }
 
     private fun idleWait(): Long {
@@ -523,6 +631,8 @@ class Notch(
             clockUntil.takeIf { clockEnabled && it > now },
             markAt.takeIf { it > now },
             markUntil.takeIf { it > now },
+            nextWaveAt.takeIf { waveUntil == 0L && it > now },
+            waveUntil.takeIf { it > now },
         ).minOrNull() ?: Long.MAX_VALUE
         return minOf(eye.idleWait(), (nextEvent - now).coerceIn(16L, 120_000L))
     }
@@ -545,8 +655,13 @@ class Notch(
         moving = look.step(dt) or moving
         moving = clockMix.step(dt) or moving
         moving = markA.step(dt) or moving
+        moving = waveA.step(dt) or moving
         if (markUntil > now && markA.value > 0.01f) {
             markPhase = (markPhase + dt * MARK_RATE) % (Math.PI.toFloat() * 2f)
+            moving = true
+        }
+        if (waveUntil > now || waveA.value > 0.01f) {
+            wavePhase = (wavePhase + dt * WAVE_RATE) % (Math.PI.toFloat() * 2f)
             moving = true
         }
         // A shape on its way out has nothing to express, and stepping the eye
@@ -602,7 +717,12 @@ class Notch(
         private const val CLOCK_DURATION = 20_000L
         private const val MARK_DELAY = 220L
         private const val MARK_DURATION = 1_800L
-        private const val MARK_RATE = 6.2f
+        private const val MARK_RATE = 4.2f
+        private const val WAVE_FIRST_DELAY = 60_000L
+        private const val WAVE_INTERVAL = 120_000L
+        private const val WAVE_DURATION = 10_000L
+        private const val WAVE_GAP = 5_000L
+        private const val WAVE_RATE = 7.5f
         private const val SHAPE_DELAY_MS = 120L
 
         // The block at the hundred per cent setting: how far it hangs down from

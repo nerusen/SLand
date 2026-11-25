@@ -774,14 +774,18 @@ class Island(
 
         midX.target = cx; wid.target = w; t.target = target.top; b.target = target.bottom
         neck.target = nk; split.target = sy; rad.target = rt; radB.target = rb
-        bubbleK.target = if (kind == Kind.Compact && (second != null || (primary?.id == "music" && (primary?.rowWidth() ?: 0f) > 0f))) 1f else 0f
+        // Sampled once and used for both the fade and the rectangle. The width
+        // is a settling spring, so asking twice in one refresh returned one value
+        // for the shape and a different one for the text, half a frame apart:
+        // that disagreement is what made the capsule look like it was shaking.
+        val rowW = if (primary?.id == "music") primary?.rowWidth() ?: 0f else 0f
+        bubbleK.target = if (kind == Kind.Compact && (second != null || rowW > 0f)) 1f else 0f
         val d = pill.height()
         bubble.set(target.right + ui.s8, pill.top, target.right + ui.s8 + d, pill.bottom)
         if (kind == Kind.Compact) {
             lyricBubble.setEmpty()
-            val lyricW = if (primary?.id == "music") primary?.rowWidth() ?: 0f else 0f
-            if (lyricW > 0f) {
-                val width = min(lyricW, span)
+            if (rowW > 0f) {
+                val width = min(rowW, span)
                 val left = target.centerX() - width / 2f
                 val top = target.bottom + ui.s8
                 lyricBubble.set(left, top, left + width, top + d)

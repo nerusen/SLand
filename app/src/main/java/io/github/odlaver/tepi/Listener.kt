@@ -48,6 +48,7 @@ class Listener : NotificationListenerService() {
     private val sentPc = HashMap<String, Long>()
     private val codes = HashMap<String, Long>()
     private val forwarded = HashSet<String>()
+    private val waSeen = HashMap<String, String>()
     lateinit var timers: Timers
     lateinit var reminders: Reminders
     lateinit var notes: Notes
@@ -140,7 +141,7 @@ class Listener : NotificationListenerService() {
     private fun tooBright(pct: Int) { val fix = Action(getString(R.string.glare_fix), primary = true, icon = Icon.Eye) { island?.open(android.content.Intent(android.provider.Settings.ACTION_DISPLAY_SETTINGS)) }; alert(Alert("glare", getString(R.string.glare_title), getString(R.string.glare_body, pct), Glyph.Eye, listOf(fix), 8000)) }
     private fun askWalk() { section(Section.ACTIVITIES) }
 
-    override fun onNotificationRemoved(sbn: StatusBarNotification) { live.removed(sbn.key); if (forwarded.remove(sbn.key)) pc.removed(sbn.key) }
+    override fun onNotificationRemoved(sbn: StatusBarNotification) { live.removed(sbn.key); waSeen.remove(sbn.key); if (forwarded.remove(sbn.key)) pc.removed(sbn.key) }
     private fun fromLaptop(name: String, uri: android.net.Uri?) { if (uri == null) { alert(Alert("pc", getString(R.string.pc_file_failed), name, Glyph.Bell, ms = 4000)); return }; val open = Action(getString(R.string.open), primary = true, icon = Icon.Open) { val type = contentResolver.getType(uri) ?: "*/*"; island?.open(android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(uri, type).addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)) }; alert(Alert("pc", getString(R.string.pc_file_in), name, Glyph.Check, listOf(open), 8000)) }
     fun sentToLaptop(ok: Boolean, name: String) { alert(Alert("pc", getString(if (ok) R.string.pc_sent else R.string.pc_send_failed), name, if (ok) Glyph.Check else Glyph.Bell, ms = 4000)) }
 
@@ -182,7 +183,16 @@ class Listener : NotificationListenerService() {
         if (!prefs.bool(WhatsAppTimer.ENABLED, false)) return
         val n = sbn.notification
         if (sbn.isOngoing || !isMessage(n) || n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
-        val (title, _) = chat(n)
+        val (title, text) = chat(n)
+        @Suppress("DEPRECATION")
+        val msgs = n.extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+        val count = msgs?.size ?: 0
+        val lastTime = (msgs?.lastOrNull() as? android.os.Bundle)?.getLong("time", 0L) ?: 0L
+        val stamp = if (lastTime != 0L) lastTime else n.`when`
+        val sig = "$count|$stamp|$title|$text"
+        if (waSeen[sbn.key] == sig) return
+        if (waSeen.size > 64) waSeen.clear()
+        waSeen[sbn.key] = sig
         WhatsAppTimer.matches(prefs, title, n)?.let { target ->
             WhatsAppTimer.notifyTarget(this, target, prefs)
         }

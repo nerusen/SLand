@@ -9,6 +9,7 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
+import android.os.Build
 import java.io.File
 import java.io.FileOutputStream
 import org.json.JSONArray
@@ -25,7 +26,8 @@ object WhatsAppTimer {
     // Android update collapse into a single callback, so the id carries the
     // message count forward — that is what lets one sound fire per message.
     private const val NOTIFY_ID_BASE = 0x5741000
-    private const val CHANNEL_ID = "whatsapp_target_alert"
+    private const val OLD_CHANNEL_ID = "whatsapp_target_alert"
+    private const val CHANNEL_ID = "whatsapp_target_alert_silent"
 
     private var player: MediaPlayer? = null
     private var playingId = 0
@@ -105,32 +107,21 @@ object WhatsAppTimer {
             ensureChannel(context, manager)
             if (manager.getNotificationChannel(CHANNEL_ID)?.importance == NotificationManager.IMPORTANCE_NONE) return false
 
-            // Android only delivers a notification callback when the message is
-            // distinct from the one already showing with that id. Two WhatsApp
-            // messages can carry the same sender and body (two "ping"s, a
-            // pasted link twice), so the id changes with every message: each one
-            // reads as new and gets its own alert. The previous one for this
-            // contact is dismissed first, so the shade still shows a single
-            // line per contact instead of a stack.
-            val prevKey = "wa.timer.prev." + target.number
-            val prevId = prefs.int(prevKey, 0)
-            if (prevId != 0) manager.cancel(prevId)
-            val id = nextId(prefs, target)
-            prefs.set(prevKey, id)
+            val id = NOTIFY_ID_BASE or (target.number.hashCode() and 0xffff)
             val open = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
             val pending = PendingIntent.getActivity(
                 context, id, open,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
-            val notification = Notification.Builder(context, CHANNEL_ID)
+            val builder = Notification.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_mark)
                 .setContentTitle(context.getString(R.string.wa_timer_notification_title, target.name))
                 .setContentText(context.getString(R.string.wa_timer_notification_body))
                 .setContentIntent(pending)
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(true)
-                .build()
-            manager.notify(id, notification)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) builder.setSilent(true)
+            manager.notify(id, builder.build())
             // Sounds are queued, not restarted: three messages landing together
             // are three sounds in a row rather than the last one cutting off the
             // rest. The silent channel keeps Android's own sound out of the way,
@@ -142,20 +133,12 @@ object WhatsAppTimer {
         }
     }
 
-    // A per-contact notification id that changes with every message, so each
-    // one is a fresh callback rather than an update of the one before it.
-    private fun nextId(prefs: Prefs, target: WhatsAppTimerTarget): Int {
-        val key = "wa.timer.id." + target.number
-        val base = target.number.hashCode() and 0xff
-        val seen = prefs.long(key, 0)
-        val id = NOTIFY_ID_BASE or (base shl 8) or ((seen and 0xffL).toInt())
-        prefs.set(key, (seen + 1) and 0xffL)
-        return id
-    }
-
     private fun ensureChannel(context: Context, manager: NotificationManager) {
+        if (manager.getNotificationChannel(OLD_CHANNEL_ID) != null) {
+            manager.deleteNotificationChannel(OLD_CHANNEL_ID)
+        }
         if (manager.getNotificationChannel(CHANNEL_ID) != null) return
-        val channel = NotificationChannel(CHANNEL_ID, context.getString(R.string.wa_timer_channel), NotificationManager.IMPORTANCE_HIGH)
+        val channel = NotificationChannel(CHANNEL_ID, context.getString(R.string.wa_timer_channel), NotificationManager.IMPORTANCE_LOW)
         channel.setSound(null, null)
         channel.enableVibration(false)
         manager.createNotificationChannel(channel)

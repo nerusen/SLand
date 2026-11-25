@@ -71,7 +71,10 @@ class Eye(private val ui: Ui) {
     // snapping into step with it.
     private val groove = Spring(0f, 0.004f, 200f, 26f)
     private val shock = Spring(0f, 0.004f, 300f, 13f)
-    private val curious = Spring(0f, 0.004f, 300f, 28f)
+    // How far the eyes have taken up the wave's own sway. A spring of its own
+    // rather than the music's, because a wave can start while a song is
+    // playing: two sways added together would read as a shiver.
+    private val waveMix = Spring(0f, 0.004f, 260f, 30f)
 
     private val solid = Paint(Paint.ANTI_ALIAS_FLAG)
     // The happy crescent is filled and then stroked with a round join, which
@@ -107,15 +110,23 @@ class Eye(private val ui: Ui) {
     // a song on wants anyway.
     private var grooving = false
 
+    // Waving hello, which the landscape notch asks for every couple of
+    // minutes. Not a mood: the face smiles while it happens, but it goes on
+    // blinking and it has to survive a notification landing in the middle of
+    // it, so it is a flag the mood machinery reads rather than a fifth mood.
+    private var waving = false
+
     // Sway phase, in radians, and the slower one the shape breathes on
     private var swayPhase = 0f
     private var pulsePhase = 0f
+    // And the wave's, which runs whether or not anything is playing
+    private var wavePhase = 0f
 
     // The event in charge, and when it hands back
     private var event = Mood.Calm
     private var eventUntil = 0L
     private var startleAt = 0L
-    private var curiousAt = 0L
+    private var glanceFrom = 0L
 
     // Blink timing: when the next one is due, and when the lid opens again
     private var blinkAt = SystemClock.uptimeMillis() + BLINK_MS
@@ -139,10 +150,9 @@ class Eye(private val ui: Ui) {
     // widenings fighting each other.
     fun startled() {
         startleAt = SystemClock.uptimeMillis()
-        curiousAt = startleAt + STARTLE_GAZE_DELAY
+        glanceFrom = startleAt + STARTLE_GAZE_DELAY
         shock.snap(1f)
         shock.target = 0f
-        curious.target = 0f
         event = Mood.Startled
         eventUntil = startleAt + STARTLE_MS
         // Eyes do not blink in the middle of a fright
@@ -179,6 +189,13 @@ class Eye(private val ui: Ui) {
         grooving = playing
     }
 
+    // Waving hello, or done waving. The eyes smile for as long as it lasts and
+    // sway gently with it, but they go on blinking all the way through: a
+    // greeting from a face that has stopped blinking is a mask.
+    fun wave(on: Boolean) {
+        waving = on
+    }
+
     // True while still moving
     fun step(dt: Float): Boolean {
         val now = SystemClock.uptimeMillis()
@@ -208,7 +225,7 @@ class Eye(private val ui: Ui) {
         }
 
         size.target = if (m == Mood.Startled) MAX_GROWTH else 1f
-        joy.target = if (m == Mood.Happy) 1f else 0f
+        joy.target = if (m == Mood.Happy || (waving && m == Mood.Calm)) 1f else 0f
         glare.target = if (m == Mood.Angry) 1f else 0f
         red.target = if (low > 0) 1f else 0f
         green.target = if (plugged) 1f else 0f
@@ -216,10 +233,10 @@ class Eye(private val ui: Ui) {
         // is also swaying to the music reads as neither: the fright is two
         // and a half seconds long and the sway can wait for it.
         groove.target = if (grooving && m == Mood.Calm) 1f else 0f
-        curious.target = if (m == Mood.Startled && now >= curiousAt) 1f else 0f
+        waveMix.target = if (waving && m == Mood.Calm) 1f else 0f
 
         var moving = false
-        for (s in arrayOf(lid, size, joy, glare, red, green, groove, shock, curious)) moving = s.step(dt) or moving
+        for (s in arrayOf(lid, size, joy, glare, red, green, groove, shock, waveMix)) moving = s.step(dt) or moving
         // The critical level pulses, so it keeps asking for frames
         if (low == CRITICAL) {
             phase = (phase + dt * THROB_RATE) % TWO_PI
@@ -240,7 +257,12 @@ class Eye(private val ui: Ui) {
             pulsePhase = (pulsePhase + dt * PULSE_RATE) % TWO_PI
             moving = true
         }
-        if (shock.value > 0.01f || (m == Mood.Startled && now < curiousAt)) moving = true
+        // The wave's own, slower than the music's: a greeting, not a dance
+        if (waveMix.value > 0.01f) {
+            wavePhase = (wavePhase + dt * WAVE_RATE) % TWO_PI
+            moving = true
+        }
+        if (shock.value > 0.01f || (m == Mood.Startled && now < glanceFrom + STARTLE_GLANCE_MS)) moving = true
         // A deadline still to come is motion as far as the caller is concerned
         if (eventUntil > now) moving = true
         return moving
@@ -272,18 +294,23 @@ class Eye(private val ui: Ui) {
     // of seconds.
     fun draw(c: Canvas, cx: Float, cy: Float, h: Float, a: Float) {
         if (h <= 0f || a <= 0.01f) return
+        val now = SystemClock.uptimeMillis()
         val k = groove.value.coerceIn(0f, 1f)
+        val w = waveMix.value.coerceIn(0f, 1f)
         // The size wobble rides the slower phase, and it is deliberately
         // small: a third of a tenth either way is a pair of eyes breathing
         // with the beat, and anything more is a pair of eyes being squeezed
         val beat = if (k > 0.01f) 1f + k * PULSE * sin(pulsePhase.toDouble()).toFloat() else 1f
         val full = h * size.value.coerceIn(0.5f, 2f) * beat
         val f = form(full)
+        // Worked out before the gap, because a pair that is looking at
+        // something holds itself a little tighter
+        val look = glance(now)
         // The air is held, so the gap is whatever the shapes are actually as
         // wide as plus that. The stroke counts: it puffs the smile out by half
         // of itself on each side, which is a whole stroke of width between the
         // two eyes.
-        val gap = full * f.wide + f.stroke + h * AIR
+        val gap = full * f.wide + f.stroke + h * AIR - h * GLANCE_AIR * abs(look)
         var ox = 0f
         var oy = 0f
         if (k > 0.01f) {
@@ -293,20 +320,58 @@ class Eye(private val ui: Ui) {
             // than a tilt that follows it
             oy = -h * SWAY_Y * k * sin(2.0 * swayPhase).toFloat()
         }
-        val elapsed = (SystemClock.uptimeMillis() - startleAt).coerceAtLeast(0L) / 1000f
+        if (w > 0.01f) {
+            ox += h * WAVE_SWAY_X * w * sin(wavePhase.toDouble()).toFloat()
+            oy -= h * WAVE_SWAY_Y * w * sin(2.0 * wavePhase).toFloat()
+        }
+        val elapsed = (now - startleAt).coerceAtLeast(0L) / 1000f
         val jolt = abs(shock.value).coerceIn(0f, 1f)
         ox += h * 0.10f * jolt * sin(elapsed * 46f)
         oy += h * 0.055f * jolt * sin(elapsed * 37f + 0.8f)
-        glow(c, cx + ox, cy + oy, gap, full, a, f)
-        one(c, cx + ox - gap / 2, cy + oy, full, a, f)
-        one(c, cx + ox + gap / 2, cy + oy, full, a, f)
-        val look = curious.value.coerceIn(0f, 1f)
-        if (look > 0.01f && mood == Mood.Startled) {
-            val radius = max(ui.dp(0.7f), full * 0.085f)
-            solid.color = ui.alpha(ui.back, a * look)
-            c.drawCircle(cx + ox - gap / 2 + full * 0.11f, cy + oy, radius, solid)
-            c.drawCircle(cx + ox + gap / 2 + full * 0.11f, cy + oy, radius, solid)
+        // Turning to look at the mark beside them, once the jolt has settled.
+        // The pair shifts, stretches slightly, and leans left-then-right
+        // toward the mark without drawing pupils inside the ovals.
+        ox += h * GLANCE_X * look
+        oy -= h * GLANCE_LIFT * abs(look)
+        if (abs(look) > 0.005f) {
+            c.save()
+            c.translate(cx + ox, cy + oy)
+            c.skew(-GLANCE_SKEW * look, 0f)
+            c.scale(1f, 1f + GLANCE_STRETCH * abs(look))
+            glow(c, 0f, 0f, gap, full, a, f)
+            one(c, -gap / 2, 0f, full, a, f)
+            one(c, gap / 2, 0f, full, a, f)
+            c.restore()
+        } else {
+            glow(c, cx + ox, cy + oy, gap, full, a, f)
+            one(c, cx + ox - gap / 2, cy + oy, full, a, f)
+            one(c, cx + ox + gap / 2, cy + oy, full, a, f)
         }
+    }
+
+    // Where the eyes are looking while a fright is on: -1 is over to the left,
+    // 1 is across to the right where the mark appears, 0 is not looking.
+    //
+    // One shot rather than a held offset, and driven by the clock rather than
+    // by a spring. A pair that slid to the right and stayed there is a pair of
+    // eyes drawn in the wrong place; the whole of the reading is the turn, so
+    // it has three beats — away to the left first, as someone does when they
+    // are not sure where the sound came from, then across to the mark, then
+    // back to centre — and each one is eased so the eyes arrive and settle
+    // instead of being switched from one side to the other.
+    private fun glance(now: Long): Float {
+        val t = (now - glanceFrom) / STARTLE_GLANCE_MS.toFloat()
+        if (t <= 0f || t >= 1f) return 0f
+        return when {
+            t < 0.30f -> -ease(t / 0.30f)
+            t < 0.75f -> -1f + 2f * ease((t - 0.30f) / 0.45f)
+            else -> 1f - ease((t - 0.75f) / 0.25f)
+        }
+    }
+
+    private fun ease(t: Float): Float {
+        val q = t.coerceIn(0f, 1f)
+        return q * q * (3f - 2f * q)
     }
 
     // The soft green halo under a charging pair.
@@ -322,19 +387,21 @@ class Eye(private val ui: Ui) {
     // the block.
     private fun glow(c: Canvas, cx: Float, cy: Float, gap: Float, full: Float, a: Float, f: Shape) {
         val g = green.value.coerceIn(0f, 1f)
-        if (g <= 0.02f || full <= 0f) return
+        val w = waveMix.value.coerceIn(0f, 1f)
+        if ((g <= 0.02f && w <= 0.02f) || full <= 0f) return
         val breathe = GLOW_FLOOR + (1f - GLOW_FLOOR) * (0.5f + 0.5f * sin(glowPhase.toDouble()).toFloat())
-        val strength = g * breathe * GLOW_A * a
+        val waveBreathe = 0.72f + 0.28f * (0.5f + 0.5f * sin(wavePhase.toDouble()).toFloat())
+        val strength = max(g * breathe * GLOW_A, w * waveBreathe * WAVE_GLOW_A) * a
         if (strength <= 0.01f) return
         val blur = max(ui.dp(1.5f), full * GLOW_BLUR)
         // The filter is rebuilt only when the radius actually changes, which
         // is on a size change rather than per frame: a BlurMaskFilter
-         // allocates, and this is called sixty times a second
+        // allocates, and this is called sixty times a second
         if (abs(blur - haloFor) > 0.5f) {
             haloFor = blur
             halo.maskFilter = android.graphics.BlurMaskFilter(blur, android.graphics.BlurMaskFilter.Blur.NORMAL)
         }
-        halo.color = ui.alpha(GREEN, strength)
+        halo.color = ui.alpha(if (g > 0.02f) mix(ui.ink, GREEN, g) else ui.ink, strength)
         // Stroked as well as filled, so the halo is a touch larger than the
         // eye it is behind and shows all the way round rather than only where
         // the blur spills
@@ -576,6 +643,16 @@ class Eye(private val ui: Ui) {
         private const val PULSE_RATE = 4.3f
         private const val PULSE = 0.03f
         private const val STARTLE_GAZE_DELAY = 280L
+        private const val STARTLE_GLANCE_MS = 1600L
+        private const val GLANCE_X = 0.24f
+        private const val GLANCE_LIFT = 0.05f
+        private const val GLANCE_AIR = 0.06f
+        private const val GLANCE_SKEW = 0.14f
+        private const val GLANCE_STRETCH = 0.08f
+        private const val WAVE_RATE = 2.4f
+        private const val WAVE_SWAY_X = 0.18f
+        private const val WAVE_SWAY_Y = 0.05f
+        private const val WAVE_GLOW_A = 0.45f
 
         // The most the eye ever grows past its resting height, which is the
         // startle, and the tallest the drawn shape gets against that grown
