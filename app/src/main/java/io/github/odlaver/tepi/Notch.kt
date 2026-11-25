@@ -11,6 +11,7 @@ import android.graphics.Typeface
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.DisplayMetrics
 import android.view.Choreographer
 import android.view.Display
@@ -22,6 +23,7 @@ import android.view.WindowManager
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

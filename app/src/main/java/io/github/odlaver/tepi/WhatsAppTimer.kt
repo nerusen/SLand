@@ -109,7 +109,6 @@ object WhatsAppTimer {
                 .setContentIntent(open)
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(true)
-                .setSilent(true)
                 .build()
             manager.notify(target.number.hashCode(), notification)
             prefs.set(key, now)

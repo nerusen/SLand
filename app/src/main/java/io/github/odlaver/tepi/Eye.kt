@@ -301,7 +301,7 @@ class Eye(private val ui: Ui) {
         one(c, cx + ox - gap / 2, cy + oy, full, a, f)
         one(c, cx + ox + gap / 2, cy + oy, full, a, f)
         val look = curious.value.coerceIn(0f, 1f)
-        if (look > 0.01f && m == Mood.Startled) {
+        if (look > 0.01f && mood == Mood.Startled) {
             val radius = max(ui.dp(0.7f), full * 0.085f)
             solid.color = ui.alpha(ui.back, a * look)
             c.drawCircle(cx + ox - gap / 2 + full * 0.11f, cy + oy, radius, solid)
