@@ -72,6 +72,40 @@ class IslandPreview(
         textAlign = Paint.Align.CENTER
     }
 
+    private var batteryLevel = 84
+    private var batteryCharging = false
+
+    private val repaintBadge = Runnable {
+        if (attached && !landscapeMode && prefs.idleBar) {
+            invalidate()
+            armBadge()
+        }
+    }
+
+    private val wake = Runnable {
+        syncLoop()
+    }
+
+    private val frame = object : Choreographer.FrameCallback {
+        override fun doFrame(t: Long) {
+            if (!attached || !landscapeMode || !prefs.notchBar) {
+                ticking = false
+                return
+            }
+            val dt = if (lastFrame == 0L) 0.016f else ((t - lastFrame) / 1e9f).coerceIn(0f, 0.05f)
+            lastFrame = t
+            val moving = eye.step(dt)
+            invalidate()
+            if (moving) {
+                Choreographer.getInstance().postFrameCallback(this)
+            } else {
+                ticking = false
+                main.removeCallbacks(wake)
+                main.postDelayed(wake, eye.idleWait())
+            }
+        }
+    }
+
     init {
         isClickable = false
         isFocusable = false
@@ -83,6 +117,7 @@ class IslandPreview(
     fun setLandscape(landscape: Boolean) {
         if (landscapeMode == landscape) return
         landscapeMode = landscape
+        if (landscape) main.removeCallbacks(repaintBadge) else armBadge()
         syncLoop()
         invalidate()
     }
@@ -253,6 +288,7 @@ class IslandPreview(
 
         val r = min(nh * Notch.CORNER, min(nw, nh) / 2f)
         val flare = min(ui.glassFlare, min(nw / 2f, nh))
+        shape.reset()
         ui.block(shape, notchRect, r, flare)
         canvas.drawPath(shape, bg)
         canvas.save()
@@ -375,9 +411,6 @@ class IslandPreview(
         canvas.drawText(text, cx, cy - (fm.ascent + fm.descent) / 2f, hintText)
     }
 
-    private var batteryLevel = 84
-    private var batteryCharging = false
-
     private fun syncBattery() {
         val intent = try {
             context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
@@ -391,13 +424,6 @@ class IslandPreview(
         batteryCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
             status == BatteryManager.BATTERY_STATUS_FULL
         eye.battery(batteryLevel, batteryCharging)
-    }
-
-    private val repaintBadge = Runnable {
-        if (attached && !landscapeMode && prefs.idleBar) {
-            invalidate()
-            armBadge()
-        }
     }
 
     private fun armBadge() {
@@ -424,30 +450,6 @@ class IslandPreview(
         ticking = false
         main.removeCallbacks(wake)
         Choreographer.getInstance().removeFrameCallback(frame)
-    }
-
-    private val wake = Runnable {
-        syncLoop()
-    }
-
-    private val frame = object : Choreographer.FrameCallback {
-        override fun doFrame(t: Long) {
-            if (!attached || !landscapeMode || !prefs.notchBar) {
-                ticking = false
-                return
-            }
-            val dt = if (lastFrame == 0L) 0.016f else ((t - lastFrame) / 1e9f).coerceIn(0f, 0.05f)
-            lastFrame = t
-            val moving = eye.step(dt)
-            invalidate()
-            if (moving) {
-                Choreographer.getInstance().postFrameCallback(this)
-            } else {
-                ticking = false
-                main.removeCallbacks(wake)
-                main.postDelayed(wake, eye.idleWait())
-            }
-        }
     }
 
     companion object {
