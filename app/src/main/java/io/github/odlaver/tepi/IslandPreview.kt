@@ -408,7 +408,7 @@ class IslandPreview(
     }
 
     private fun syncLoop() {
-        if (attached && landscapeMode && prefs.notchBar && prefs.notchEye) {
+        if (attached && landscapeMode && prefs.notchBar) {
             if (!ticking) {
                 ticking = true
                 lastFrame = 0L
@@ -432,7 +432,7 @@ class IslandPreview(
 
     private val frame = object : Choreographer.FrameCallback {
         override fun doFrame(t: Long) {
-            if (!attached || !landscapeMode || !prefs.notchBar || !prefs.notchEye) {
+            if (!attached || !landscapeMode || !prefs.notchBar) {
                 ticking = false
                 return
             }
