@@ -526,6 +526,11 @@
     <string name="greeting_name_hint">Your name</string>
     <string name="greeting_name_note">Up to %1$d characters. The greeting stays white for every theme.</string>
     <string name="saved">Saved</string>
+    <string name="island_preview">Live preview</string>
+    <string name="preview_portrait">Mode Potrait</string>
+    <string name="preview_landscape">Mode Landscape</string>
+    <string name="preview_capsule_off">Capsule is hidden</string>
+    <string name="preview_notch_off">Notch is hidden</string>
 
     <!-- The eyes sway to whatever is playing -->
     <string name="eye_sway">Sway to music</string>

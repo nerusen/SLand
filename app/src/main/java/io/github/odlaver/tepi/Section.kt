@@ -4,12 +4,19 @@ import android.app.AlertDialog
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.provider.ContactsContract
 import android.provider.OpenableColumns
 import android.provider.Settings
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
 import android.widget.LinearLayout
+import android.widget.TextView
 
 // One settings category per page
 class Section : Page() {
@@ -17,6 +24,18 @@ class Section : Page() {
     private var kuliaEmail = ""
     private var kuliaSent = false
     private var waEnableAfterPermission = false
+    private var previewLandscape = false
+    private var islandPreview: IslandPreview? = null
+
+    override fun onResume() {
+        super.onResume()
+        islandPreview?.refresh()
+    }
+
+    override fun changed() {
+        super.changed()
+        islandPreview?.refresh()
+    }
 
     override fun build() {
         when (intent.getStringExtra(MODE)) {
@@ -140,8 +159,78 @@ class Section : Page() {
         note(getString(R.string.tabs_note))
     }
 
+    private fun buildPreview(into: LinearLayout) {
+        val tabs = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dpi(4f), dpi(4f), dpi(4f), dpi(4f))
+            background = GradientDrawable().apply {
+                setColor(fill)
+                cornerRadius = dp(12f)
+            }
+        }
+        fun makeTab(label: String): TextView = text(label, 13f, sub, bold = true).apply {
+            gravity = Gravity.CENTER
+            minimumHeight = dpi(38f)
+            setPadding(dpi(8f), dpi(6f), dpi(8f), dpi(6f))
+        }
+        val portraitTab = makeTab(getString(R.string.preview_portrait))
+        val landscapeTab = makeTab(getString(R.string.preview_landscape))
+        val preview = IslandPreview(this, prefs)
+        islandPreview = preview
+
+        fun syncTabs() {
+            fun style(tab: TextView, active: Boolean) {
+                tab.setTextColor(if (active) paper else sub)
+                tab.background = GradientDrawable().apply {
+                    setColor(if (active) ink else Color.TRANSPARENT)
+                    cornerRadius = dp(9f)
+                }
+            }
+            style(portraitTab, !previewLandscape)
+            style(landscapeTab, previewLandscape)
+            preview.setLandscape(previewLandscape)
+        }
+
+        portraitTab.setOnClickListener {
+            if (previewLandscape) {
+                previewLandscape = false
+                syncTabs()
+            }
+        }
+        landscapeTab.setOnClickListener {
+            if (!previewLandscape) {
+                previewLandscape = true
+                syncTabs()
+            }
+        }
+
+        tabs.addView(portraitTab, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        tabs.addView(landscapeTab, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        into.addView(tabs, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        into.addView(preview, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = dpi(10f)
+        })
+        syncTabs()
+        preview.refresh()
+    }
+
     private fun island() {
-        header(getString(R.string.section_island))
+        val sticky = resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
+        if (sticky) {
+            pinned.visibility = View.VISIBLE
+            col.setPadding(dpi(24f), dpi(4f), dpi(24f), dpi(32f))
+            if (pinned.childCount == 0) {
+                header(getString(R.string.section_island), into = pinned)
+                buildPreview(pinned)
+            } else {
+                islandPreview?.setLandscape(previewLandscape)
+                islandPreview?.refresh()
+            }
+        } else {
+            pinned.visibility = View.GONE
+            header(getString(R.string.section_island))
+            buildPreview(col)
+        }
         val g = group()
         row(g, getString(R.string.th_title), getString(R.string.th_row_sub, getString(Theme.of(prefs).label)), icon = Icon.Palette) {
             startActivity(Intent(this, Section::class.java).putExtra(MODE, THEME))
@@ -165,6 +254,7 @@ class Section : Page() {
             toggle(c, getString(R.string.island_shadow), getString(R.string.island_shadow_sub), prefs.islandShadow, icon = Icon.Layers) {
                 prefs.islandShadow = it
                 changed()
+                rebuild()
             }
             if (prefs.islandShadow) {
                 choice(c, getString(R.string.shadow_intensity),

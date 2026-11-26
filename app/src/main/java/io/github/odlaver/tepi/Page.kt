@@ -29,6 +29,7 @@ abstract class Page : Activity() {
     protected var sub = 0
     protected var fill = 0
     protected lateinit var col: LinearLayout
+    protected lateinit var pinned: LinearLayout
 
     protected fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, resources.displayMetrics)
     protected fun dpi(v: Float) = dp(v).toInt()
@@ -42,21 +43,36 @@ abstract class Page : Activity() {
         fill = withAlpha(ink, if (Color.luminance(paper) > 0.5f) 14 else 22)
         // Edge-to-edge needs Android 11
         if (Build.VERSION.SDK_INT >= 30) window.setDecorFitsSystemWindows(false)
+        pinned = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpi(24f), dpi(16f), dpi(24f), dpi(8f))
+            visibility = View.GONE
+        }
         col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dpi(24f), dpi(16f), dpi(24f), dpi(32f))
         }
-        val scroll = ScrollView(this).apply { addView(col) }
-        scroll.setOnApplyWindowInsetsListener { v, insets ->
+        val scroll = ScrollView(this).apply {
+            clipToPadding = false
+            addView(col)
+        }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(pinned, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        }
+        root.setOnApplyWindowInsetsListener { v, insets ->
             if (Build.VERSION.SDK_INT >= 30) {
                 val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout() or WindowInsets.Type.ime())
-                v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                v.setPadding(bars.left, bars.top, bars.right, 0)
+                scroll.setPadding(0, 0, 0, bars.bottom)
             } else {
-                v.setPadding(insets.systemWindowInsetLeft, insets.systemWindowInsetTop, insets.systemWindowInsetRight, insets.systemWindowInsetBottom)
+                v.setPadding(insets.systemWindowInsetLeft, insets.systemWindowInsetTop, insets.systemWindowInsetRight, 0)
+                scroll.setPadding(0, 0, 0, insets.systemWindowInsetBottom)
             }
             insets
         }
-        setContentView(scroll)
+        setContentView(root)
         build()
     }
 
@@ -68,7 +84,7 @@ abstract class Page : Activity() {
     }
 
     // Page title with a back control
-    protected fun header(title: String, back: Boolean = true) {
+    protected fun header(title: String, back: Boolean = true, into: LinearLayout = col) {
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         if (back) {
             row.addView(text("‹", 30f, ink).apply {
@@ -81,7 +97,7 @@ abstract class Page : Activity() {
             }, LinearLayout.LayoutParams(dpi(48f), dpi(48f)).apply { marginStart = -dpi(12f) })
         }
         row.addView(text(title, 22f, ink, bold = true))
-        col.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
+        into.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
     }
 
     protected fun label(s: String) = col.addView(text(s, 12f, sub).apply { setPadding(dpi(4f), dpi(20f), 0, dpi(6f)) })
@@ -271,5 +287,5 @@ abstract class Page : Activity() {
         (Color.blue(a) * (1 - k) + Color.blue(b) * k).toInt(),
     )
 
-    protected fun changed() = Listener.instance?.prefsChanged()
+    protected open fun changed() = Listener.instance?.prefsChanged()
 }

@@ -371,14 +371,7 @@ class Notch(
     // comfortable inside a block four times longer than it is deep, but the
     // check costs nothing — and the pair now spreads as the crescents widen,
     // so the widest it ever gets is worth asking for rather than assuming.
-    private fun eyeHeight(depth: Float, length: Float): Float {
-        val scale = prefs.notchEye.coerceIn(Prefs.NOTCH_EYE_MIN, Prefs.NOTCH_EYE_MAX) / 100f
-        val tall = depth * EYE_ROOM / (Eye.MAX_GROWTH * Eye.MAX_EXTENT)
-        // pairWidth is for one unit of resting height, so dividing gives the
-        // height the available length can afford
-        val long = length * EYE_SPAN / max(1f, eye.pairWidth(1f))
-        return min(depth * EYE_H * scale, min(tall, long))
-    }
+    private fun eyeHeight(depth: Float, length: Float): Float = eyeHeight(prefs, eye, depth, length)
 
     @Suppress("DEPRECATION")
     private fun place(force: Boolean) {
@@ -704,6 +697,13 @@ class Notch(
         fun depth(ui: Ui, prefs: Prefs, screenH: Float): Float {
             val scale = prefs.notchSize.coerceIn(Prefs.NOTCH_SIZE_MIN, Prefs.NOTCH_SIZE_MAX) / 100f
             return min(ui.dp(DEPTH * scale), screenH * MAX_DEEP)
+        }
+
+        fun eyeHeight(prefs: Prefs, eye: Eye, depth: Float, length: Float): Float {
+            val scale = prefs.notchEye.coerceIn(Prefs.NOTCH_EYE_MIN, Prefs.NOTCH_EYE_MAX) / 100f
+            val tall = depth * EYE_ROOM / (Eye.MAX_GROWTH * Eye.MAX_EXTENT)
+            val long = length * EYE_SPAN / max(1f, eye.pairWidth(1f))
+            return min(depth * EYE_H * scale, min(tall, long))
         }
 
         // The two free corners, as a fraction of the depth: just under half,
