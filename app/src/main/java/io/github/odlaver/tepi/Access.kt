@@ -12,13 +12,20 @@ import android.widget.Toast
 class Access : AccessibilityService() {
     override fun onServiceConnected() {
         instance = this
-        Prefs(this).set(PAUSED, false)
+        val p = Prefs(this)
+        val wasPaused = p.bool(PAUSED, false)
+        p.set(PAUSED, false)
+        p.set(PAUSED_PKG, "")
+        p.set(PAUSED_AT, 0L)
         // Events from bank apps only, window changes only
         serviceInfo = serviceInfo.apply {
             eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
             packageNames = BANKS
         }
         Listener.instance?.rehost()
+        if (wasPaused) {
+            Toast.makeText(this, getString(R.string.bank_restored), Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -28,9 +35,13 @@ class Access : AccessibilityService() {
 
     // Banks refuse to run beside accessibility
     fun stepAside(pkg: String?) {
-        Prefs(this).set(PAUSED, true)
+        val p = Prefs(this)
+        p.set(PAUSED, true)
+        p.set(PAUSED_PKG, pkg ?: "")
+        p.set(PAUSED_AT, android.os.SystemClock.uptimeMillis())
         val name = pkg?.let { try { packageManager.getApplicationLabel(packageManager.getApplicationInfo(it, 0)).toString() } catch (_: Exception) { null } }
         Toast.makeText(this, if (name != null) getString(R.string.bank_stepped, name) else getString(R.string.bank_stepped_any), Toast.LENGTH_LONG).show()
+        Listener.instance?.onBankModeStarted(pkg)
         disableSelf()
     }
 
@@ -75,6 +86,8 @@ class Access : AccessibilityService() {
             private set
 
         const val PAUSED = "bank.paused"
+        const val PAUSED_PKG = "bank.paused_pkg"
+        const val PAUSED_AT = "bank.paused_at"
 
         // Indonesian banking apps known to block accessibility
         val BANKS = arrayOf(

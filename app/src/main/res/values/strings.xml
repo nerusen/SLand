@@ -367,6 +367,10 @@
     <string name="bank_stepped_any">Accessibility is off, banking apps can open. Turn it on again from Tepi when you\’re done.</string>
     <string name="perm_access_on">Opening a banking app turns this off. Hold the island and pick Bank mode for other apps.</string>
     <string name="perm_access_paused">Off for a banking app. Turn it on again when you\’re done.</string>
+    <string name="bank_restore_title">Bank mode finished</string>
+    <string name="bank_restore_body">Turn Accessibility back on to restore full Tepi features.</string>
+    <string name="bank_restore_action">Turn on</string>
+    <string name="bank_restored">Tepi accessibility restored</string>
     <string name="wifi">Wi-Fi</string>
     <string name="bluetooth">Bluetooth</string>
     <string name="percent">%1$d%%</string>

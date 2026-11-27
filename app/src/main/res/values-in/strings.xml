@@ -364,6 +364,10 @@
     <string name="bank_stepped_any">Aksesibilitas mati, aplikasi bank bisa dibuka. Nyalakan lagi dari Tepi setelah selesai.</string>
     <string name="perm_access_on">Membuka aplikasi bank akan mematikan ini. Untuk aplikasi lain, tahan island lalu pilih Mode bank.</string>
     <string name="perm_access_paused">Mati karena aplikasi bank. Nyalakan lagi setelah selesai.</string>
+    <string name="bank_restore_title">Mode bank selesai</string>
+    <string name="bank_restore_body">Nyalakan kembali Aksesibilitas agar fitur Tepi berjalan penuh.</string>
+    <string name="bank_restore_action">Nyalakan</string>
+    <string name="bank_restored">Aksesibilitas Tepi aktif kembali</string>
     <string name="wifi">Wi-Fi</string>
     <string name="bluetooth">Bluetooth</string>
     <string name="percent">%1$d%%</string>

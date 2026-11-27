@@ -98,7 +98,7 @@ class Listener : NotificationListenerService() {
 
     override fun onListenerConnected() { instance = this; connected = true; media = Media(this, ComponentName(this, Listener::class.java)) { island?.mediaChanged() }.also { it.start() }; applyEnabled() }
 
-    fun applyEnabled() { if (prefs.enabled) { reminders.start(); watch.start(); agenda.start(); wallet.start(); pc.start(); radios.start(); github.start(); capture.start(); volume.start(); flags.start(); steps.start(); glare.start(); try { activeNotifications?.forEach { live.posted(it) } } catch (_: Exception) { }; ensureIsland() } else { island?.detach(); island = null; reminders.stop(); watch.stop(); agenda.stop(); wallet.stop(); pc.stop(); radios.stop(); github.stop(); capture.stop(); volume.stop(); flags.stop(); steps.stop(); glare.stop(); live.clear() }; Tile.refresh(this) }
+    fun applyEnabled() { if (prefs.enabled) { reminders.start(); watch.start(); agenda.start(); wallet.start(); pc.start(); radios.start(); github.start(); capture.start(); volume.start(); flags.start(); steps.start(); glare.start(); try { activeNotifications?.forEach { live.posted(it) } } catch (_: Exception) { }; ensureIsland(); if (Access.paused(this)) startBankMonitor() } else { island?.detach(); island = null; reminders.stop(); watch.stop(); agenda.stop(); wallet.stop(); pc.stop(); radios.stop(); github.stop(); capture.stop(); volume.stop(); flags.stop(); steps.stop(); glare.stop(); live.clear() }; Tile.refresh(this) }
 
     override fun onListenerDisconnected() { connected = false; teardown(); if (prefs.enabled) android.os.Handler(mainLooper).postDelayed({ if (!connected) try { NotificationListenerService.requestRebind(ComponentName(this, Listener::class.java)) } catch (_: Exception) { } }, REBIND_DELAY_MS) }
     override fun onDestroy() { teardown(); super.onDestroy() }
@@ -206,6 +206,67 @@ class Listener : NotificationListenerService() {
     private fun appLabel(pkg: String): String = try { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() } catch (_: Exception) { pkg }
     private fun appIcon(pkg: String): Bitmap? = try { bitmap(packageManager.getApplicationIcon(pkg)) } catch (_: Exception) { null }
     private fun bitmap(d: Drawable): Bitmap { if (d is BitmapDrawable && d.bitmap != null) return d.bitmap; val side = (48 * resources.displayMetrics.density).toInt(); val bmp = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888); val c = Canvas(bmp); d.setBounds(0, 0, side, side); d.draw(c); return bmp }
+
+    private var bankMonitoring = false
+    private var wasBankForeground = false
+    private var bankPromptShown = false
+
+    fun onBankModeStarted(pkg: String?) {
+        wasBankForeground = true
+        bankPromptShown = false
+        startBankMonitor()
+    }
+
+    private fun startBankMonitor() {
+        if (bankMonitoring) return
+        bankMonitoring = true
+        checkBankStatus()
+    }
+
+    private fun checkBankStatus() {
+        if (!Access.paused(this)) {
+            bankMonitoring = false
+            bankPromptShown = false
+            wasBankForeground = false
+            return
+        }
+        val pkg = prefs.str(Access.PAUSED_PKG, "")
+        val inForeground = isAppInForeground(pkg)
+        val pausedAt = prefs.long(Access.PAUSED_AT, 0L)
+        val elapsed = SystemClock.uptimeMillis() - pausedAt
+
+        if (wasBankForeground && !inForeground && !bankPromptShown && elapsed > 1500L) {
+            bankPromptShown = true
+            promptBankRestore()
+        } else if (inForeground) {
+            wasBankForeground = true
+        }
+
+        android.os.Handler(mainLooper).postDelayed({
+            if (Access.paused(this)) checkBankStatus() else { bankMonitoring = false; bankPromptShown = false }
+        }, 2000L)
+    }
+
+    private fun isAppInForeground(pkg: String): Boolean {
+        if (pkg.isEmpty()) return false
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager ?: return false
+        val procs = am.runningAppProcesses ?: return false
+        return procs.any { it.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND && it.processName == pkg }
+    }
+
+    fun promptBankRestore() {
+        val act = Action(getString(R.string.bank_restore_action), primary = true, icon = Icon.Hand) {
+            Access.openSettings(this)
+        }
+        alert(Alert(
+            key = "bank_restore",
+            title = getString(R.string.bank_restore_title),
+            body = getString(R.string.bank_restore_body),
+            glyph = Glyph.Bolt,
+            actions = listOf(act),
+            ms = 12000L
+        ))
+    }
 
     fun rehost() { island?.detach(); island = null; ensureIsland() }
     fun prefsChanged() { island?.prefsChanged() }
